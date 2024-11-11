@@ -1,0 +1,16 @@
+{
+    "factorio.versions": [
+        {
+            "name": "v2",
+            "factorioPath": "d:\\Perso\\Factorio_Test\\Factorio_2.0.7\\bin\\x64\\factorio.exe",
+            "active": true
+        }
+    ],
+    "Lua.workspace.userThirdParty": [
+        "c:\\Users\\Helfima\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b37c822dc23317127aacc7413ad25f23\\justarandomgeek.factoriomod-debug\\sumneko-3rd"
+    ],
+    "Lua.workspace.checkThirdParty": "ApplyInMemory",
+    "Lua.workspace.library": [
+        "D:\\Workspaces\\HelfimaLib\\src"
+    ]
+}
