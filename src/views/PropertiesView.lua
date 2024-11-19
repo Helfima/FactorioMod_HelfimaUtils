@@ -60,8 +60,13 @@ end
 ---@param event EventModData
 function PropertiesView:update_menu(event)
     local flow_panel, content_panel, submenu_panel, menu_panel = self:get_panel()
-    
-    local selector_panel = GuiElement.add(submenu_panel, GuiFlowH("selector"))
+    submenu_panel.style.height = 0
+    local menu_flow = GuiElement.add(submenu_panel, GuiTable("filters"):column(3))
+    menu_flow.style.horizontal_spacing = 20
+    menu_flow.style.vertical_align = "center"
+
+    local selector_panel = GuiElement.add(menu_flow, GuiFlowH("selector"))
+    selector_panel.style.horizontal_spacing = 5
 
     local items = {"item","entity","recipe"}
     local selected = User.get_parameter("type_choosed") or "item"
@@ -72,13 +77,43 @@ function PropertiesView:update_menu(event)
     dropdown.style.width = 27
     dropdown.style.height = 27
 
+    -- Runtime API
     local runtime_api = Cache.get_data(self.classname, "runtime_api")
-    local runtime_api_panel = GuiElement.add(submenu_panel, GuiFlowH("runtime_api"))
-    local json_string = GuiElement.add(runtime_api_panel, GuiTextField(self.classname, "change_runtime_api"))
+    local runtime_api_panel = GuiElement.add(menu_flow, GuiFlowH())
     if runtime_api then
         GuiElement.add(runtime_api_panel, GuiLabel("runtime_api_label"):caption(" API Version: "))
         GuiElement.add(runtime_api_panel, GuiLabel("runtime_api_version"):caption(runtime_api["application_version"]))
     end
+    local json_string = GuiElement.add(menu_flow, GuiTextField(self.classname, "change_runtime_api"))
+
+    ---nil values
+    local cell_filter_nil = GuiElement.add(menu_flow, GuiFlowH())
+    cell_filter_nil.style.horizontal_spacing = 5
+    local switch_nil = "left"
+    if User.get_parameter("filter_property_nil") == true then
+        switch_nil = "right"
+    end
+    GuiElement.add(cell_filter_nil, GuiLabel("filter-nil-property"):caption("Hide nil values:"))
+    local filter_switch = GuiElement.add(cell_filter_nil, GuiSwitch(self.classname, "filter_property_switch", "nil"):state(switch_nil):leftLabel("Off"):rightLabel("On"))
+    
+    ---difference values
+    local cell_filter_diff = GuiElement.add(menu_flow, GuiFlowH())
+    cell_filter_diff.style.horizontal_spacing = 5
+    local switch_nil = "left"
+    if User.get_parameter("filter_property_diff") == true then
+        switch_nil = "right"
+    end
+    GuiElement.add(cell_filter_diff, GuiLabel("filter-difference-property"):caption("Show differences:"))
+    local filter_switch = GuiElement.add(cell_filter_diff, GuiSwitch(self.classname, "filter_property_switch", "diff"):state(switch_nil):leftLabel("Off"):rightLabel( "On"))
+
+    -- filter
+    local cell_filter = GuiElement.add(menu_flow, GuiFlowH())
+    cell_filter.style.horizontal_spacing = 5
+    GuiElement.add(cell_filter, GuiLabel("filter-property-label"):caption("Filter:"))
+    local filter_value = User.get_parameter("filter-property")
+    local filter_field = GuiElement.add(cell_filter, GuiTextField(self.classname, "filter-property", "onchange"):text(filter_value))
+    filter_field.style.width = 300
+
 end
 
 ---@param event EventModData
@@ -88,36 +123,49 @@ function PropertiesView:update_data(event)
 
     local prototype = self:get_data()
 
-    local table = GuiElement.add(content_panel, GuiTable("item"):column(3):style("bordered_table"))
+    local table = GuiElement.add(content_panel, GuiTable("item"):column(3):style(defines.mod.styles.table.bordered_gray))
 
     local sorter = function(t, a, b) return t[b]["name"] > t[a]["name"] end
     for _, attribute in spairs(prototype.header, sorter) do
-        local cell_name = GuiElement.add(table, GuiFlowH())
+        local cell_name = GuiElement.add(table, GuiFlowH():tooltip(attribute.description))
         GuiElement.add(cell_name, GuiLabel("content"):caption(attribute.name))
+        
         local cell_type = GuiElement.add(table, GuiFlowH())
         GuiElement.add(cell_type, GuiLabel("content"):caption(attribute.type))
+        
         local cell_content = GuiElement.add(table, GuiFlowH())
         GuiElement.add(cell_content, GuiLabel("content"):caption(attribute.value))
     end
 
     for _, attribute in spairs(prototype.attributes, sorter) do
-        local cell_name = GuiElement.add(table, GuiFlowH())
-        GuiElement.add(cell_name, GuiLabel("content"):caption(attribute.name))
-        local cell_type = GuiElement.add(table, GuiFlowH())
-        GuiElement.add(cell_type, GuiLabel("content"):caption(attribute.type))
-        local cell_content = GuiElement.add(table, GuiFlowH())
-        if attribute.type == "userdata" then
-            self:update_attribute_userdata(cell_content, attribute)
-        elseif attribute.type == "table" then
-            self:update_attribute_table(cell_content, attribute.value)
-        else
-            GuiElement.add(cell_content, GuiLabel("content"):caption(attribute.value or ""))
+        if not(User.get_parameter("filter_property_nil") and attribute.value == nil) then
+            
+            local cell_name = GuiElement.add(table, GuiFlowH())
+            GuiElement.add(cell_name, GuiLabel("content"):caption(attribute.name):tooltip(attribute.description))
+            
+            local cell_type = GuiElement.add(table, GuiFlowH())
+            GuiElement.add(cell_type, GuiLabel("content"):caption(attribute.type))
+            
+            local cell_content = GuiElement.add(table, GuiFlowH())
+            if attribute.type == "userdata" then
+                self:update_attribute_userdata(cell_content, attribute)
+            elseif attribute.type == "table" then
+                self:update_attribute_table(cell_content, attribute.value)
+            elseif attribute.type == "boolean" then
+                if attribute.value then
+                    GuiElement.add(cell_content, GuiLabel("content"):caption("true"))
+                else
+                    GuiElement.add(cell_content, GuiLabel("content"):caption("false"))
+                end
+            else
+                GuiElement.add(cell_content, GuiLabel("content"):caption(attribute.value or ""))
+            end
         end
     end
 end
 
 function PropertiesView:update_attribute_table(parent, content)
-    local table = GuiElement.add(parent, GuiTable("item"):column(2))
+    local table = GuiElement.add(parent, GuiTable("item"):column(2):style(defines.mod.styles.table.bordered_green))
     for name, value in pairs(content) do
         local cell_name = GuiElement.add(table, GuiFlowH())
         GuiElement.add(cell_name, GuiLabel("content"):caption(name))
@@ -139,6 +187,7 @@ function PropertiesView:update_attribute_table(parent, content)
 end
 
 function PropertiesView:update_attribute_userdata(parent, attribute)
+    GuiElement.add(parent, GuiLabel("content"):caption(attribute.value.object_name))
 end
 
 -------------------------------------------------------------------------------
@@ -169,28 +218,35 @@ function PropertiesView:on_event(event)
         end
         Dispatcher:send(defines.mod.events.on_gui_update, nil, self.classname)
     end
+
+    if event.action == "filter_property_switch" then
+        local switch_nil = event.element.switch_state == "right"
+        local parameter_name = string.format("filter_property_%s", event.item1)
+        User.set_parameter(parameter_name, switch_nil)
+        Dispatcher:send(defines.mod.events.on_gui_update, nil, self.classname)
+    end
 end
 
 function PropertiesView:get_data()
     local element_choosed = User.get_parameter("element_choosed") or {}
     local prototype = {header={},attributes={}}
-    table.insert(prototype.header, self:get_attribute_data("type", "string",element_choosed.type))
-    table.insert(prototype.header, self:get_attribute_data("name", "string",element_choosed.name))
-    table.insert(prototype.header, self:get_attribute_data("quality", "string",element_choosed.quality))
+    table.insert(prototype.header, self:get_attribute_data("type", nil, "string", element_choosed.type))
+    table.insert(prototype.header, self:get_attribute_data("name", nil, "string", element_choosed.name))
+    table.insert(prototype.header, self:get_attribute_data("quality", nil, "string", element_choosed.quality))
 
     local lua_prototype= self:get_lua_prototype(element_choosed)
-    table.insert(prototype.attributes, self:get_attribute_data("lua_prototype",lua_prototype.object_name))
+    table.insert(prototype.attributes, self:get_attribute_data("lua_prototype", nil, lua_prototype.object_name))
     local lua_attributes = self:get_classe_attributes(lua_prototype.object_name)
     for _, lua_attribute in pairs(lua_attributes) do
         local content = lua_prototype[lua_attribute.name]
         local content_type = type(content)
-        table.insert(prototype.attributes, self:get_attribute_data(lua_attribute.name, content_type,content))
+        table.insert(prototype.attributes, self:get_attribute_data(lua_attribute.name, lua_attribute.description, content_type,content))
     end
     return prototype
 end
 
-function PropertiesView:get_attribute_data(name, type, value)
-    local attribute_data = {name=name, type=type, value=value}
+function PropertiesView:get_attribute_data(name, description, type, value)
+    local attribute_data = {name=name, description=description, type=type, value=value}
     return attribute_data
 end
 
