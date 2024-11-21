@@ -3,9 +3,10 @@
 ---@class PropertiesView : Form
 PropertiesView = newclass(Form, function(base, classname)
     Form.init(base, classname)
+    base.inner_frame = defines.mod.styles.frame.inside_deep
     base.auto_clear = true
     base.mod_menu = true
-    base.submenu_enabled = true
+    base.submenu_enabled = false
 end)
 
 
@@ -39,7 +40,7 @@ end
 ---@param event EventModData
 function PropertiesView:on_before_delete_cache(event)
     -- remove all data
-    Dispatcher:send(defines.mod.events.on_gui_update, nil, MapOptionsView.classname)
+    Dispatcher:send(defines.mod.events.on_gui_update, nil, PropertiesView.classname)
 end
 
 -------------------------------------------------------------------------------
@@ -50,76 +51,100 @@ function PropertiesView:get_button_sprites()
 end
 
 -------------------------------------------------------------------------------
+---On before open
+---@param event EventModData
+function PropertiesView:on_open_before(event)
+end
+
+-------------------------------------------------------------------------------
 ---On Update
 ---@param event EventModData
 function PropertiesView:on_update(event)
-    self:update_menu(event)
-    self:update_data(event)
+    self:update_properties(event)
+    self:update_runtime_api(event)
 end
 
 ---@param event EventModData
-function PropertiesView:update_menu(event)
-    local flow_panel, content_panel, submenu_panel, menu_panel = self:get_panel()
-    submenu_panel.style.height = 0
-    local menu_flow = GuiElement.add(submenu_panel, GuiTable("filters"):column(3))
-    menu_flow.style.horizontal_spacing = 20
-    menu_flow.style.vertical_align = "center"
+function PropertiesView:update_properties(event)
+    local content_panel = self:get_tab("properties", "Properties")
+    content_panel.clear()
+    self:update_properties_menu(event, content_panel)
+    self:update_properties_data(event, content_panel)
+end
 
-    local selector_panel = GuiElement.add(menu_flow, GuiFlowH("selector"))
-    selector_panel.style.horizontal_spacing = 5
+---@param event EventModData
+---@param parent LuaGuiElement
+function PropertiesView:update_properties_menu(event, parent)
+    local content_panel = GuiElement.add(parent, GuiFlowH("menu"))
+    content_panel.style.horizontally_stretchable = true
+    content_panel.style.bottom_margin = 5
+
+    local left_panel = GuiElement.add(content_panel, GuiFlowH("left"))
+    local right_panel = GuiElement.add(content_panel, GuiFlowH("right"))
+    right_panel.style.left_margin = 20
+
+    local left_flow = GuiElement.add(left_panel, GuiTable("filters"):column(2))
+    left_flow.style.horizontal_spacing = 5
+    left_flow.style.vertical_align = "center"
+
+    -- selector
+    GuiElement.add(left_flow, GuiLabel("choose-label"):caption("Choose:"))
+
+    local cell_selector = GuiElement.add(left_flow, GuiFlowH("selector"))
+    cell_selector.style.horizontal_spacing = 5
+
 
     local items = {"item","entity","recipe"}
     local selected = User.get_parameter("type_choosed") or "item"
-    GuiElement.add(selector_panel, GuiDropDown(self.classname, "type_choose"):items(items, selected))
+    GuiElement.add(cell_selector, GuiDropDown(self.classname, "type_choose"):items(items, selected))
 
     local choose_type = string.format("%s-with-quality", selected)
-    local dropdown = GuiElement.add(selector_panel, GuiButtonSprite(self.classname, "element_choose"):choose(choose_type):style(defines.mod.styles.button.select_icon))
+    local dropdown = GuiElement.add(cell_selector, GuiButtonSprite(self.classname, "element_choose"):choose(choose_type):style(defines.mod.styles.button.select_icon))
     dropdown.style.width = 27
     dropdown.style.height = 27
 
+    -- filter
+    GuiElement.add(left_flow, GuiLabel("filter-property-label"):caption("Filter:"))
+    local filter_value = User.get_parameter("filter-property")
+    local filter_field = GuiElement.add(left_flow, GuiTextField(self.classname, "filter-property", "onchange"):text(filter_value))
+    filter_field.style.width = 300
+    
+    local right_flow = GuiElement.add(right_panel, GuiTable("filters"):column(2))
+    right_flow.style.horizontal_spacing = 5
+    right_flow.style.vertical_align = "center"
+
     -- Runtime API
     local runtime_api = Cache.get_data(self.classname, "runtime_api")
-    local runtime_api_panel = GuiElement.add(menu_flow, GuiFlowH())
+    GuiElement.add(right_flow, GuiLabel("runtime_api_label"):caption("API Version:"))
     if runtime_api then
-        GuiElement.add(runtime_api_panel, GuiLabel("runtime_api_label"):caption(" API Version: "))
-        GuiElement.add(runtime_api_panel, GuiLabel("runtime_api_version"):caption(runtime_api["application_version"]))
+        GuiElement.add(right_flow, GuiLabel("runtime_api_version"):caption(runtime_api["application_version"]))
+    else
+        GuiElement.add(right_flow, GuiLabel("runtime_api_version"):caption("Need import runtime API"))
     end
-    local json_string = GuiElement.add(menu_flow, GuiTextField(self.classname, "change_runtime_api"))
 
     ---nil values
-    local cell_filter_nil = GuiElement.add(menu_flow, GuiFlowH())
-    cell_filter_nil.style.horizontal_spacing = 5
     local switch_nil = "left"
     if User.get_parameter("filter_property_nil") == true then
         switch_nil = "right"
     end
-    GuiElement.add(cell_filter_nil, GuiLabel("filter-nil-property"):caption("Hide nil values:"))
-    local filter_switch = GuiElement.add(cell_filter_nil, GuiSwitch(self.classname, "filter_property_switch", "nil"):state(switch_nil):leftLabel("Off"):rightLabel("On"))
-    
+    GuiElement.add(right_flow, GuiLabel("filter-nil-property"):caption("Hide nil values:"))
+    GuiElement.add(right_flow, GuiSwitch(self.classname, "filter_property_switch", "nil"):state(switch_nil):leftLabel("Off"):rightLabel("On"))
+
     ---difference values
-    local cell_filter_diff = GuiElement.add(menu_flow, GuiFlowH())
-    cell_filter_diff.style.horizontal_spacing = 5
     local switch_nil = "left"
     if User.get_parameter("filter_property_diff") == true then
         switch_nil = "right"
     end
-    GuiElement.add(cell_filter_diff, GuiLabel("filter-difference-property"):caption("Show differences:"))
-    local filter_switch = GuiElement.add(cell_filter_diff, GuiSwitch(self.classname, "filter_property_switch", "diff"):state(switch_nil):leftLabel("Off"):rightLabel( "On"))
-
-    -- filter
-    local cell_filter = GuiElement.add(menu_flow, GuiFlowH())
-    cell_filter.style.horizontal_spacing = 5
-    GuiElement.add(cell_filter, GuiLabel("filter-property-label"):caption("Filter:"))
-    local filter_value = User.get_parameter("filter-property")
-    local filter_field = GuiElement.add(cell_filter, GuiTextField(self.classname, "filter-property", "onchange"):text(filter_value))
-    filter_field.style.width = 300
+    GuiElement.add(right_flow, GuiLabel("filter-difference-property"):caption("Show differences:"))
+    GuiElement.add(right_flow, GuiSwitch(self.classname, "filter_property_switch", "diff"):state(switch_nil):leftLabel("Off"):rightLabel( "On"))
 
 end
 
 ---@param event EventModData
-function PropertiesView:update_data(event)
-    local content_panel = self:get_scroll_panel("data")
-    content_panel.clear()
+---@param parent LuaGuiElement
+function PropertiesView:update_properties_data(event, parent)
+    local content_panel = GuiElement.add(parent, GuiScroll("content"))
+    content_panel.style.horizontally_stretchable = true
 
     local prototype = self:get_data()
 
@@ -128,7 +153,7 @@ function PropertiesView:update_data(event)
     local sorter = function(t, a, b) return t[b]["name"] > t[a]["name"] end
     for _, attribute in spairs(prototype.header, sorter) do
         local cell_name = GuiElement.add(table, GuiFlowH():tooltip(attribute.description))
-        GuiElement.add(cell_name, GuiLabel("content"):caption(attribute.name))
+        GuiElement.add(cell_name, GuiLabel("content"):caption(attribute.name):style(defines.mod.styles.label.heading_2))
         
         local cell_type = GuiElement.add(table, GuiFlowH())
         GuiElement.add(cell_type, GuiLabel("content"):caption(attribute.type))
@@ -141,7 +166,13 @@ function PropertiesView:update_data(event)
         if not(User.get_parameter("filter_property_nil") and attribute.value == nil) then
             
             local cell_name = GuiElement.add(table, GuiFlowH())
-            GuiElement.add(cell_name, GuiLabel("content"):caption(attribute.name):tooltip(attribute.description))
+            GuiElement.add(cell_name, GuiLabel("content"):caption(attribute.name):tooltip(attribute.description):style(defines.mod.styles.label.heading_2))
+            if attribute.description ~= nil and attribute.description ~= '' then
+                local sprite = GuiElement.add(cell_name, GuiSprite("info"):sprite("menu", defines.sprites.status_information.white):tooltip(attribute.description))
+                sprite.style.size = 15
+                sprite.style.stretch_image_to_widget_size = true
+                sprite.style.margin = 5
+            end
             
             local cell_type = GuiElement.add(table, GuiFlowH())
             GuiElement.add(cell_type, GuiLabel("content"):caption(attribute.type))
@@ -190,6 +221,42 @@ function PropertiesView:update_attribute_userdata(parent, attribute)
     GuiElement.add(parent, GuiLabel("content"):caption(attribute.value.object_name))
 end
 
+---@param event EventModData
+function PropertiesView:update_runtime_api(event)
+    local content_panel = self:get_tab("runtime_api", "Runtime API")
+    content_panel.clear()
+    self:update_runtime_api_menu(event, content_panel)
+    self:update_runtime_api_data(event, content_panel)
+end
+
+---@param event EventModData
+---@param parent LuaGuiElement
+function PropertiesView:update_runtime_api_menu(event, parent)
+    local content_panel = GuiElement.add(parent, GuiFlowV("menu"))
+    content_panel.style.horizontally_stretchable = true
+
+    local menu_flow = GuiElement.add(content_panel, GuiTable("filters"):column(2))
+    menu_flow.style.horizontal_spacing = 20
+    menu_flow.style.vertical_align = "center"
+
+    -- Runtime API
+    local runtime_api = Cache.get_data(self.classname, "runtime_api")
+    GuiElement.add(menu_flow, GuiLabel("runtime_api_label"):caption("API Version:"))
+    GuiElement.add(menu_flow, GuiLabel("runtime_api_version"):caption(runtime_api["application_version"]))
+
+    GuiElement.add(menu_flow, GuiLabel("runtime_api_input"):caption("Input json"))
+    GuiElement.add(menu_flow, GuiTextField(self.classname, "change_runtime_api"))
+
+end
+
+---@param event EventModData
+---@param parent LuaGuiElement
+function PropertiesView:update_runtime_api_data(event, parent)
+    local content_panel = GuiElement.add(parent, GuiScroll("content"))
+    content_panel.style.horizontally_stretchable = true
+
+end
+
 -------------------------------------------------------------------------------
 ---On event
 ---@param event EventModData
@@ -235,7 +302,7 @@ function PropertiesView:get_data()
     table.insert(prototype.header, self:get_attribute_data("quality", nil, "string", element_choosed.quality))
 
     local lua_prototype= self:get_lua_prototype(element_choosed)
-    table.insert(prototype.attributes, self:get_attribute_data("lua_prototype", nil, lua_prototype.object_name))
+    table.insert(prototype.header, self:get_attribute_data("lua_prototype", nil, "string", lua_prototype.object_name))
     local lua_attributes = self:get_classe_attributes(lua_prototype.object_name)
     for _, lua_attribute in pairs(lua_attributes) do
         local content = lua_prototype[lua_attribute.name]
