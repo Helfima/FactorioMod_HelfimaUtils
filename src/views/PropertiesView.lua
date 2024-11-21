@@ -94,11 +94,11 @@ function PropertiesView:update_properties_menu(event, parent)
     cell_selector.style.horizontal_spacing = 5
 
 
-    local items = {"item","entity","recipe"}
+    local items = {"achievement","decorative","entity","equipment","fluid","item","item-group","recipe","signal","technology","tile","asteroid-chunk","space-location","item-with-quality","entity-with-quality","recipe-with-quality","equipment-with-quality"}
     local selected = User.get_parameter("type_choosed") or "item"
     GuiElement.add(cell_selector, GuiDropDown(self.classname, "type_choose"):items(items, selected))
 
-    local choose_type = string.format("%s-with-quality", selected)
+    local choose_type = string.format("%s", selected)
     local dropdown = GuiElement.add(cell_selector, GuiButtonSprite(self.classname, "element_choose"):choose(choose_type):style(defines.mod.styles.button.select_icon))
     dropdown.style.width = 27
     dropdown.style.height = 27
@@ -146,24 +146,52 @@ function PropertiesView:update_properties_data(event, parent)
     local content_panel = GuiElement.add(parent, GuiScroll("content"))
     content_panel.style.horizontally_stretchable = true
 
-    local prototype = self:get_data()
+    local elements_choosed = User.get_parameter("elements_choosed") or {}
+    local prototype_keys = {}
+    local prototypes = {header={},attributes={}}
+    for key, element_choosed in pairs(elements_choosed) do
+        prototype_keys[key] = true
+        local prototype = self:get_data(element_choosed)
+        for _, attribute in pairs(prototype.header) do
+            local attribute_key = attribute.name
+            if prototypes.header[attribute_key] == nil then
+                prototypes.header[attribute_key] = {name=attribute.name, attribute.description, type=attribute.type, values={}}
+            end
+            prototypes.header[attribute_key]["values"][key] = attribute.value
+        end
+        for _, attribute in pairs(prototype.attributes) do
+            local attribute_key = attribute.name
+            if prototypes.attributes[attribute_key] == nil then
+                prototypes.attributes[attribute_key] = {name=attribute.name, attribute.description, type=attribute.type, values={}}
+            end
+            prototypes.attributes[attribute_key]["values"][key] = attribute.value
+        end
+    end
+    local column_count = 2 + table_size(prototype_keys)
 
-    local table = GuiElement.add(content_panel, GuiTable("item"):column(3):style(defines.mod.styles.table.bordered_gray))
+    local table = GuiElement.add(content_panel, GuiTable("item"):column(column_count):style(defines.mod.styles.table.bordered_gray))
 
     local sorter = function(t, a, b) return t[b]["name"] > t[a]["name"] end
-    for _, attribute in spairs(prototype.header, sorter) do
+    for _, attribute in spairs(prototypes.header, sorter) do
         local cell_name = GuiElement.add(table, GuiFlowH():tooltip(attribute.description))
         GuiElement.add(cell_name, GuiLabel("content"):caption(attribute.name):style(defines.mod.styles.label.heading_2))
         
         local cell_type = GuiElement.add(table, GuiFlowH())
         GuiElement.add(cell_type, GuiLabel("content"):caption(attribute.type))
         
-        local cell_content = GuiElement.add(table, GuiFlowH())
-        GuiElement.add(cell_content, GuiLabel("content"):caption(attribute.value))
+        for key, _ in pairs(prototype_keys) do
+            local value = attribute.values[key]
+            local cell_content = GuiElement.add(table, GuiFlowH())
+            if attribute.type == "sprite" then
+                GuiElement.add(cell_content, GuiButtonSprite(self.classname, "element_delete", key):sprite(value.type, value.name))
+            else
+                GuiElement.add(cell_content, GuiLabel("content"):caption(value))
+            end
+        end
     end
 
-    for _, attribute in spairs(prototype.attributes, sorter) do
-        if not(User.get_parameter("filter_property_nil") and attribute.value == nil) then
+    for _, attribute in spairs(prototypes.attributes, sorter) do
+        if not(User.get_parameter("filter_property_nil") and PropertiesView.values_is_nil(attribute.values)) then
             
             local cell_name = GuiElement.add(table, GuiFlowH())
             GuiElement.add(cell_name, GuiLabel("content"):caption(attribute.name):tooltip(attribute.description):style(defines.mod.styles.label.heading_2))
@@ -177,26 +205,43 @@ function PropertiesView:update_properties_data(event, parent)
             local cell_type = GuiElement.add(table, GuiFlowH())
             GuiElement.add(cell_type, GuiLabel("content"):caption(attribute.type))
             
-            local cell_content = GuiElement.add(table, GuiFlowH())
-            if attribute.type == "userdata" then
-                self:update_attribute_userdata(cell_content, attribute)
-            elseif attribute.type == "table" then
-                self:update_attribute_table(cell_content, attribute.value)
-            elseif attribute.type == "boolean" then
-                if attribute.value then
-                    GuiElement.add(cell_content, GuiLabel("content"):caption("true"))
+            for key, _ in pairs(prototype_keys) do
+                local value = attribute.values[key]
+                local value_type = type(value)
+                local cell_content = GuiElement.add(table, GuiFlowH())
+                if value_type == "userdata" then
+                    self:update_attribute_userdata(cell_content, value)
+                elseif value_type == "table" then
+                    self:update_attribute_table(cell_content, value)
+                elseif value_type == "boolean" then
+                    if value then
+                        GuiElement.add(cell_content, GuiLabel("content"):caption("true"))
+                    else
+                        GuiElement.add(cell_content, GuiLabel("content"):caption("false"))
+                    end
                 else
-                    GuiElement.add(cell_content, GuiLabel("content"):caption("false"))
+                    GuiElement.add(cell_content, GuiLabel("content"):caption(value or ""))
                 end
-            else
-                GuiElement.add(cell_content, GuiLabel("content"):caption(attribute.value or ""))
             end
         end
     end
 end
 
+function PropertiesView.values_is_nil(values)
+    for key, value in pairs(values) do
+        if value ~= nil then
+            return false
+        end
+    end
+    return true
+end
+
 function PropertiesView:update_attribute_table(parent, content)
-    local table = GuiElement.add(parent, GuiTable("item"):column(2):style(defines.mod.styles.table.bordered_green))
+    local table_style = defines.mod.styles.table.bordered_green
+    if #content > 0 then
+        table_style = defines.mod.styles.table.bordered_yellow
+    end
+    local table = GuiElement.add(parent, GuiTable("item"):column(2):style(table_style))
     for name, value in pairs(content) do
         local cell_name = GuiElement.add(table, GuiFlowH())
         GuiElement.add(cell_name, GuiLabel("content"):caption(name))
@@ -207,7 +252,7 @@ function PropertiesView:update_attribute_table(parent, content)
             GuiElement.add(cell_content, GuiLabel("content"):caption(value.object_name))
         elseif content_type == "table" then
             if #content > 0 then
-                self:update_attribute_table(cell_content, value)
+                self:update_attribute_table(cell_content, value, 2)
             else
                 GuiElement.add(cell_content, GuiLabel("content"):caption("table"))
             end
@@ -217,8 +262,8 @@ function PropertiesView:update_attribute_table(parent, content)
     end
 end
 
-function PropertiesView:update_attribute_userdata(parent, attribute)
-    GuiElement.add(parent, GuiLabel("content"):caption(attribute.value.object_name))
+function PropertiesView:update_attribute_userdata(parent, value)
+    GuiElement.add(parent, GuiLabel("content"):caption(value.object_name))
 end
 
 ---@param event EventModData
@@ -257,6 +302,19 @@ function PropertiesView:update_runtime_api_data(event, parent)
 
 end
 
+---Return elementkey
+---@param element any
+---@return string
+function PropertiesView.get_key(element)
+    local key = nil
+    if element.quality == nil then
+        key = string.format("%s_%s", element.type, element.name)
+    else
+        key = string.format("%s_%s_%s", element.type, element.name, element.quality)
+    end
+    return key
+end
+
 -------------------------------------------------------------------------------
 ---On event
 ---@param event EventModData
@@ -273,7 +331,18 @@ function PropertiesView:on_event(event)
         local element_type = User.get_parameter("type_choosed") or "item"
         local element_value = event.element.elem_value
         local element_choosed = {type=element_type, name=element_value.name, quality=element_value.quality }
-        User.set_parameter("element_choosed", element_choosed)
+        local element_key = PropertiesView.get_key(element_choosed)
+        local elements_choosed = User.get_parameter("elements_choosed") or {}
+        elements_choosed[element_key] = element_choosed
+        User.set_parameter("elements_choosed", elements_choosed)
+        Dispatcher:send(defines.mod.events.on_gui_update, nil, self.classname)
+    end
+
+    if event.action == "element_delete" then
+        local element_key = event.item1
+        local elements_choosed = User.get_parameter("elements_choosed") or {}
+        elements_choosed[element_key] = nil
+        User.set_parameter("elements_choosed", elements_choosed)
         Dispatcher:send(defines.mod.events.on_gui_update, nil, self.classname)
     end
 
@@ -294,9 +363,9 @@ function PropertiesView:on_event(event)
     end
 end
 
-function PropertiesView:get_data()
-    local element_choosed = User.get_parameter("element_choosed") or {}
+function PropertiesView:get_data(element_choosed)
     local prototype = {header={},attributes={}}
+    table.insert(prototype.header, self:get_attribute_data("icon", nil, "sprite", element_choosed))
     table.insert(prototype.header, self:get_attribute_data("type", nil, "string", element_choosed.type))
     table.insert(prototype.header, self:get_attribute_data("name", nil, "string", element_choosed.name))
     table.insert(prototype.header, self:get_attribute_data("quality", nil, "string", element_choosed.quality))
@@ -305,7 +374,10 @@ function PropertiesView:get_data()
     table.insert(prototype.header, self:get_attribute_data("lua_prototype", nil, "string", lua_prototype.object_name))
     local lua_attributes = self:get_classe_attributes(lua_prototype.object_name)
     for _, lua_attribute in pairs(lua_attributes) do
-        local content = lua_prototype[lua_attribute.name]
+        local content = nil
+        pcall(function()
+            content = lua_prototype[lua_attribute.name]
+        end)
         local content_type = type(content)
         table.insert(prototype.attributes, self:get_attribute_data(lua_attribute.name, lua_attribute.description, content_type,content))
     end
@@ -318,7 +390,10 @@ function PropertiesView:get_attribute_data(name, description, type, value)
 end
 
 function PropertiesView:get_lua_prototype(element)
-    local lua_prototype = prototypes[element.type][element.name]
+    local lua_prototype = {}
+    pcall(function()
+        lua_prototype = prototypes[element.type][element.name]
+    end)
     return lua_prototype
 end
 
