@@ -96,12 +96,10 @@ function PropertiesView:update_properties_menu(event, parent)
 
     local items = {"achievement","decorative","entity","equipment","fluid","item","item-group","recipe","signal","technology","tile","asteroid-chunk","space-location","item-with-quality","entity-with-quality","recipe-with-quality","equipment-with-quality"}
     local selected = User.get_parameter("type_choosed") or "item"
-    GuiElement.add(cell_selector, GuiDropDown(self.classname, "type_choose"):items(items, selected))
+    GuiElement.add(cell_selector, GuiDropDown(self.classname, "type-choose"):items(items, selected))
 
     local choose_type = string.format("%s", selected)
-    local dropdown = GuiElement.add(cell_selector, GuiButtonSprite(self.classname, "element_choose"):choose(choose_type):style(defines.mod.styles.button.select_icon))
-    dropdown.style.width = 27
-    dropdown.style.height = 27
+    local selector = GuiElement.add(cell_selector, GuiButton(self.classname, "element-choose"):caption("Selector"))
 
     -- filter
     GuiElement.add(left_flow, GuiLabel("filter-property-label"):caption("Filter:"))
@@ -114,7 +112,7 @@ function PropertiesView:update_properties_menu(event, parent)
     right_flow.style.vertical_align = "center"
 
     -- Runtime API
-    local runtime_api = Cache.get_data(self.classname, "runtime_api")
+    local runtime_api = Cache.get_data(self.classname, "runtime-api")
     GuiElement.add(right_flow, GuiLabel("runtime_api_label"):caption("API Version:"))
     if runtime_api then
         GuiElement.add(right_flow, GuiLabel("runtime_api_version"):caption(runtime_api["application_version"]))
@@ -128,7 +126,7 @@ function PropertiesView:update_properties_menu(event, parent)
         switch_nil = "right"
     end
     GuiElement.add(right_flow, GuiLabel("filter-nil-property"):caption("Hide nil values:"))
-    GuiElement.add(right_flow, GuiSwitch(self.classname, "filter_property_switch", "nil"):state(switch_nil):leftLabel("Off"):rightLabel("On"))
+    GuiElement.add(right_flow, GuiSwitch(self.classname, "filter-property-switch", "nil"):state(switch_nil):leftLabel("Off"):rightLabel("On"))
 
     ---difference values
     local switch_nil = "left"
@@ -136,7 +134,7 @@ function PropertiesView:update_properties_menu(event, parent)
         switch_nil = "right"
     end
     GuiElement.add(right_flow, GuiLabel("filter-difference-property"):caption("Show differences:"))
-    GuiElement.add(right_flow, GuiSwitch(self.classname, "filter_property_switch", "diff"):state(switch_nil):leftLabel("Off"):rightLabel( "On"))
+    GuiElement.add(right_flow, GuiSwitch(self.classname, "filter-property-switch", "diff"):state(switch_nil):leftLabel("Off"):rightLabel( "On"))
 
 end
 
@@ -183,7 +181,7 @@ function PropertiesView:update_properties_data(event, parent)
             local value = attribute.values[key]
             local cell_content = GuiElement.add(table, GuiFlowH())
             if attribute.type == "sprite" then
-                GuiElement.add(cell_content, GuiButtonSprite(self.classname, "element_delete", key):sprite(value.type, value.name))
+                GuiElement.add(cell_content, GuiButtonSprite(self.classname, "element-delete", key):sprite(value.type, value.name))
             else
                 GuiElement.add(cell_content, GuiLabel("content"):caption(value))
             end
@@ -290,7 +288,7 @@ function PropertiesView:update_runtime_api_menu(event, parent)
     GuiElement.add(menu_flow, GuiLabel("runtime_api_version"):caption(runtime_api["application_version"]))
 
     GuiElement.add(menu_flow, GuiLabel("runtime_api_input"):caption("Input json"))
-    GuiElement.add(menu_flow, GuiTextField(self.classname, "change_runtime_api"))
+    GuiElement.add(menu_flow, GuiTextField(self.classname, "change-runtime-api"))
 
 end
 
@@ -320,25 +318,27 @@ end
 ---@param event EventModData
 function PropertiesView:on_event(event)
 
-    if event.action == "type_choose" then
+    if event.action == "type-choose" then
         local dropdown = event.element
         local type_choosed = dropdown.get_item(dropdown.selected_index)
         User.set_parameter("type_choosed", type_choosed)
         Dispatcher:send(defines.mod.events.on_gui_update, nil, self.classname)
     end
 
-    if event.action == "element_choose" then
+    if event.action == "element-choose" then
         local element_type = User.get_parameter("type_choosed") or "item"
-        local element_value = event.element.elem_value
-        local element_choosed = {type=element_type, name=element_value.name, quality=element_value.quality }
-        local element_key = PropertiesView.get_key(element_choosed)
+        Dispatcher:send(defines.mod.events.on_gui_open, {sender=self.classname, element_type=element_type}, "HLSelector")
+    end
+
+    if event.action == "selector-return" then
+        local element_key = PropertiesView.get_key(event.selected_element)
         local elements_choosed = User.get_parameter("elements_choosed") or {}
-        elements_choosed[element_key] = element_choosed
+        elements_choosed[element_key] = event.selected_element
         User.set_parameter("elements_choosed", elements_choosed)
         Dispatcher:send(defines.mod.events.on_gui_update, nil, self.classname)
     end
 
-    if event.action == "element_delete" then
+    if event.action == "element-delete" then
         local element_key = event.item1
         local elements_choosed = User.get_parameter("elements_choosed") or {}
         elements_choosed[element_key] = nil
@@ -346,7 +346,7 @@ function PropertiesView:on_event(event)
         Dispatcher:send(defines.mod.events.on_gui_update, nil, self.classname)
     end
 
-    if event.action == "change_runtime_api" then
+    if event.action == "change-runtime-api" then
         local json_string = event.element.text
         local api = helpers.json_to_table(json_string)
         if api ~= nil then
