@@ -3,10 +3,9 @@
 ---@class PropertiesView : Form
 PropertiesView = newclass(Form, function(base, classname)
     Form.init(base, classname)
-    base.inner_frame = defines.mod.styles.frame.inside_deep
     base.auto_clear = true
     base.mod_menu = true
-    base.submenu_enabled = false
+    base.submenu_enabled = true
 end)
 
 
@@ -26,7 +25,6 @@ end
 ---On initialization
 function PropertiesView:on_init()
     self.panel_caption = { "HelfimaUtils.properties-title" }
-    --self.parameterLast = string.format("%s_%s",self.classname,"last")
 end
 
 -------------------------------------------------------------------------------
@@ -60,27 +58,17 @@ end
 ---On Update
 ---@param event EventModData
 function PropertiesView:on_update(event)
-    self:update_properties(event)
-    self:update_runtime_api(event)
+    self:update_properties_menu(event)
+    self:update_properties_data(event)
 end
 
 ---@param event EventModData
-function PropertiesView:update_properties(event)
-    local content_panel = self:get_tab("properties", "Properties")
-    content_panel.clear()
-    self:update_properties_menu(event, content_panel)
-    self:update_properties_data(event, content_panel)
-end
+function PropertiesView:update_properties_menu(event)
+    local flow_panel, content_panel, submenu_panel, menu_panel = self:get_panel()
+    submenu_panel.style.height = 0
 
----@param event EventModData
----@param parent LuaGuiElement
-function PropertiesView:update_properties_menu(event, parent)
-    local content_panel = GuiElement.add(parent, GuiFlowH("menu"))
-    content_panel.style.horizontally_stretchable = true
-    content_panel.style.bottom_margin = 5
-
-    local left_panel = GuiElement.add(content_panel, GuiFlowH("left"))
-    local right_panel = GuiElement.add(content_panel, GuiFlowH("right"))
+    local left_panel = GuiElement.add(submenu_panel, GuiFlowH("left"))
+    local right_panel = GuiElement.add(submenu_panel, GuiFlowH("right"))
     right_panel.style.left_margin = 20
 
     local left_flow = GuiElement.add(left_panel, GuiTable("filters"):column(2))
@@ -112,9 +100,9 @@ function PropertiesView:update_properties_menu(event, parent)
     right_flow.style.vertical_align = "center"
 
     -- Runtime API
-    local runtime_api = Cache.get_data(self.classname, "runtime-api")
+    local runtime_api = RuntimeApi.get_api()
     GuiElement.add(right_flow, GuiLabel("runtime_api_label"):caption("API Version:"))
-    if runtime_api then
+    if runtime_api ~= nil then
         GuiElement.add(right_flow, GuiLabel("runtime_api_version"):caption(runtime_api["application_version"]))
     else
         GuiElement.add(right_flow, GuiLabel("runtime_api_version"):caption("Need import runtime API"))
@@ -139,12 +127,16 @@ function PropertiesView:update_properties_menu(event, parent)
 end
 
 ---@param event EventModData
----@param parent LuaGuiElement
-function PropertiesView:update_properties_data(event, parent)
-    local content_panel = GuiElement.add(parent, GuiScroll("content"))
-    content_panel.style.horizontally_stretchable = true
+function PropertiesView:update_properties_data(event)
+    local content_panel = self:get_scroll_panel("data")
 
     local elements_choosed = User.get_parameter("elements_choosed") or {}
+
+    if table_size(elements_choosed) == 0 then
+        GuiElement.add(content_panel, GuiLabel("nothing"):caption("Choose a element!"))
+        return
+    end
+
     local prototype_keys = {}
     local prototypes = {header={},attributes={}}
     for key, element_choosed in pairs(elements_choosed) do
@@ -189,8 +181,8 @@ function PropertiesView:update_properties_data(event, parent)
     end
 
     for _, attribute in spairs(prototypes.attributes, sorter) do
-        if not(User.get_parameter("filter_property_nil") and PropertiesView.values_is_nil(attribute.values)) then
-            
+        if not(User.get_parameter("filter_property_nil") and PropertiesView.values_is_nil(attribute.values)) and
+        not(User.get_parameter("filter_property_diff") and PropertiesView.values_is_same(attribute.values)) then
             local cell_name = GuiElement.add(table, GuiFlowH())
             GuiElement.add(cell_name, GuiLabel("content"):caption(attribute.name):tooltip(attribute.description):style(defines.mod.styles.label.heading_2))
             if attribute.description ~= nil and attribute.description ~= '' then
@@ -205,33 +197,53 @@ function PropertiesView:update_properties_data(event, parent)
             
             for key, _ in pairs(prototype_keys) do
                 local value = attribute.values[key]
-                local value_type = type(value)
-                local cell_content = GuiElement.add(table, GuiFlowH())
-                if value_type == "userdata" then
-                    self:update_attribute_userdata(cell_content, value)
-                elseif value_type == "table" then
-                    self:update_attribute_table(cell_content, value)
-                elseif value_type == "boolean" then
-                    if value then
-                        GuiElement.add(cell_content, GuiLabel("content"):caption("true"))
-                    else
-                        GuiElement.add(cell_content, GuiLabel("content"):caption("false"))
-                    end
-                else
-                    GuiElement.add(cell_content, GuiLabel("content"):caption(value or ""))
-                end
+                self:update_attribute_value(table, value)
             end
         end
     end
 end
 
-function PropertiesView.values_is_nil(values)
-    for key, value in pairs(values) do
-        if value ~= nil then
-            return false
+---@param parent LuaGuiElement
+---@param content any
+function PropertiesView:update_userdata(parent, content)
+    local table = GuiElement.add(parent, GuiTable("item"):column(3):style(defines.mod.styles.table.bordered_gray))
+    local sorter = function(t, a, b) return t[b]["name"] > t[a]["name"] end
+    for _, attribute in spairs(content.attributes, sorter) do
+        if attribute.value ~= nil then
+            local cell_name = GuiElement.add(table, GuiFlowH())
+            GuiElement.add(cell_name, GuiLabel("content"):caption(attribute.name):tooltip(attribute.description):font_color(defines.color.purple.violet))
+            
+            local cell_type = GuiElement.add(table, GuiFlowH())
+            GuiElement.add(cell_type, GuiLabel("content"):caption(attribute.type))
+            
+            self:update_attribute_value(table, attribute.value)
         end
     end
-    return true
+end
+
+function PropertiesView:update_attribute_value(table, value)
+    local value_type = type(value)
+    local cell_content = GuiElement.add(table, GuiFlowH())
+    if value_type == "userdata" then
+        self:update_attribute_userdata(cell_content, value)
+    elseif value_type == "table" then
+        local size = table_size(value)
+        if size == 0 then
+            GuiElement.add(cell_content, GuiLabel("content"):caption("{empty}"):color("red"))
+        elseif size < 10 then
+            self:update_attribute_table(cell_content, value)
+        else
+            GuiElement.add(cell_content, GuiLink(self.classname, "expand-content"):caption({"HelfimaUtils.expand-content"}):tags({value=value}):font_color(defines.color.blue.deep_sky_blue))
+        end
+    elseif value_type == "boolean" then
+        if value then
+            GuiElement.add(cell_content, GuiLabel("content"):caption("true"))
+        else
+            GuiElement.add(cell_content, GuiLabel("content"):caption("false"))
+        end
+    else
+        GuiElement.add(cell_content, GuiLabel("content"):caption(value or ""))
+    end
 end
 
 function PropertiesView:update_attribute_table(parent, content)
@@ -247,12 +259,15 @@ function PropertiesView:update_attribute_table(parent, content)
 
         local content_type = type(value)
         if content_type == "userdata" then
-            GuiElement.add(cell_content, GuiLabel("content"):caption(value.object_name))
+            self:update_attribute_userdata(cell_content, value)
         elseif content_type == "table" then
-            if #content > 0 then
-                self:update_attribute_table(cell_content, value, 2)
+            local size = table_size(value)
+            if size == 0 then
+                GuiElement.add(cell_content, GuiLabel("content"):caption("empty table"))
+            elseif size < 10 then
+                self:update_attribute_table(cell_content, value)
             else
-                GuiElement.add(cell_content, GuiLabel("content"):caption("table"))
+                GuiElement.add(cell_content, GuiLink(self.classname, "expand-content"):caption({"HelfimaUtils.expand-content"}):tags({value=value}):font_color(defines.color.blue.deep_sky_blue))
             end
         else
             GuiElement.add(cell_content, GuiLabel("content"):caption(value))
@@ -260,44 +275,14 @@ function PropertiesView:update_attribute_table(parent, content)
     end
 end
 
-function PropertiesView:update_attribute_userdata(parent, value)
-    GuiElement.add(parent, GuiLabel("content"):caption(value.object_name))
-end
-
----@param event EventModData
-function PropertiesView:update_runtime_api(event)
-    local content_panel = self:get_tab("runtime_api", "Runtime API")
-    content_panel.clear()
-    self:update_runtime_api_menu(event, content_panel)
-    self:update_runtime_api_data(event, content_panel)
-end
-
----@param event EventModData
----@param parent LuaGuiElement
-function PropertiesView:update_runtime_api_menu(event, parent)
-    local content_panel = GuiElement.add(parent, GuiFlowV("menu"))
-    content_panel.style.horizontally_stretchable = true
-
-    local menu_flow = GuiElement.add(content_panel, GuiTable("filters"):column(2))
-    menu_flow.style.horizontal_spacing = 20
-    menu_flow.style.vertical_align = "center"
-
-    -- Runtime API
-    local runtime_api = Cache.get_data(self.classname, "runtime_api")
-    GuiElement.add(menu_flow, GuiLabel("runtime_api_label"):caption("API Version:"))
-    GuiElement.add(menu_flow, GuiLabel("runtime_api_version"):caption(runtime_api["application_version"]))
-
-    GuiElement.add(menu_flow, GuiLabel("runtime_api_input"):caption("Input json"))
-    GuiElement.add(menu_flow, GuiTextField(self.classname, "change-runtime-api"))
-
-end
-
----@param event EventModData
----@param parent LuaGuiElement
-function PropertiesView:update_runtime_api_data(event, parent)
-    local content_panel = GuiElement.add(parent, GuiScroll("content"))
-    content_panel.style.horizontally_stretchable = true
-
+function PropertiesView:update_attribute_userdata(parent, lua_prototype)
+    local object_name = lua_prototype.object_name
+    local localised_name = lua_prototype.object_name
+    pcall(function()
+        localised_name = lua_prototype.name
+    end)
+    local value = self:get_userdata(lua_prototype)
+    GuiElement.add(parent, GuiLink(self.classname, "expand-userdata", object_name):tags({value=value}):caption(localised_name):font_color(defines.color.purple.orchid))
 end
 
 ---Return elementkey
@@ -313,10 +298,88 @@ function PropertiesView.get_key(element)
     return key
 end
 
+function PropertiesView.values_is_nil(values)
+    for key, value in pairs(values) do
+        if value ~= nil then
+            return false
+        end
+    end
+    return true
+end
+
+function PropertiesView.values_is_same(values)
+    local first = nil
+    for key, value in pairs(values) do
+        if first == nil then
+            first = value
+        else
+            if type(value) == "userdata" then
+                if value.object_name ~= first.object_name then
+                    return false
+                end
+            elseif type(value) == "table" then
+                if not(table_size(value) == 0 and table_size(first) == 0) then
+                    local result = PropertiesView.table_is_same(value, first)
+                    if result == false then
+                        return false
+                    end
+                end
+            else
+                if value ~= first then
+                    return false
+                end
+            end
+        end
+    end
+    return true
+end
+
+function PropertiesView.table_is_same(table1, table2)
+    for key, value1 in pairs(table1) do
+        local value2 = table2[key]
+        if value2 ~= nil then
+            if type(value1) == "userdata" then
+                if value1.object_name ~= value2.object_name then
+                    return false
+                end
+            elseif type(value1) == "table" then
+                local result = PropertiesView.table_is_same(value1, value2)
+                if result == false then
+                    return false
+                end
+            else
+                if value1 ~= value2 then
+                    return false
+                end
+            end
+        end
+    end
+    return true
+end
+
 -------------------------------------------------------------------------------
 ---On event
 ---@param event EventModData
 function PropertiesView:on_event(event)
+
+    if event.action == "follow-link" then
+        local information = {section="classes", sub_section=event.item1}
+        Dispatcher:send(defines.mod.events.on_gui_open, {sender=self.classname, information=information}, "RuntimaApiView")
+    end
+    
+    if event.action == "expand-content" then
+        local cell_content = event.element.parent
+        local value = event.element.tags.value
+        cell_content.clear()
+        self:update_attribute_table(cell_content, value)
+    end
+
+    if event.action == "expand-userdata" then
+        local cell_content = event.element.parent
+        local value = event.element.tags.value
+        cell_content.clear()
+        self:update_userdata(cell_content, value)
+    end
 
     if event.action == "type-choose" then
         local dropdown = event.element
@@ -346,16 +409,7 @@ function PropertiesView:on_event(event)
         Dispatcher:send(defines.mod.events.on_gui_update, nil, self.classname)
     end
 
-    if event.action == "change-runtime-api" then
-        local json_string = event.element.text
-        local api = helpers.json_to_table(json_string)
-        if api ~= nil then
-            Cache.set_data(self.classname, "runtime_api", api)
-        end
-        Dispatcher:send(defines.mod.events.on_gui_update, nil, self.classname)
-    end
-
-    if event.action == "filter_property_switch" then
+    if event.action == "filter-property-switch" then
         local switch_nil = event.element.switch_state == "right"
         local parameter_name = string.format("filter_property_%s", event.item1)
         User.set_parameter(parameter_name, switch_nil)
@@ -372,14 +426,34 @@ function PropertiesView:get_data(element_choosed)
 
     local lua_prototype= self:get_lua_prototype(element_choosed)
     table.insert(prototype.header, self:get_attribute_data("lua_prototype", nil, "string", lua_prototype.object_name))
-    local lua_attributes = self:get_classe_attributes(lua_prototype.object_name)
-    for _, lua_attribute in pairs(lua_attributes) do
-        local content = nil
-        pcall(function()
-            content = lua_prototype[lua_attribute.name]
-        end)
-        local content_type = type(content)
-        table.insert(prototype.attributes, self:get_attribute_data(lua_attribute.name, lua_attribute.description, content_type,content))
+    local lua_classe = RuntimeApi.get_classe(lua_prototype.object_name)
+    while lua_classe ~= nil do
+        for _, lua_attribute in pairs(lua_classe.attributes) do
+            local content = nil
+            pcall(function()
+                content = lua_prototype[lua_attribute.name]
+            end)
+            local content_type = type(content)
+            table.insert(prototype.attributes, self:get_attribute_data(lua_attribute.name, lua_attribute.description, content_type,content))
+        end
+        lua_classe = RuntimeApi.get_classe(lua_classe.parent)
+    end
+    return prototype
+end
+
+function PropertiesView:get_userdata(lua_prototype)
+    local prototype = {header={},attributes={}}
+    local lua_classe = RuntimeApi.get_classe(lua_prototype.object_name)
+    while lua_classe ~= nil do
+        for _, lua_attribute in pairs(lua_classe.attributes) do
+            local content = nil
+            pcall(function()
+                content = lua_prototype[lua_attribute.name]
+            end)
+            local content_type = type(content)
+            table.insert(prototype.attributes, self:get_attribute_data(lua_attribute.name, lua_attribute.description, content_type,content))
+        end
+        lua_classe = RuntimeApi.get_classe(lua_classe.parent)
     end
     return prototype
 end
@@ -391,21 +465,10 @@ end
 
 function PropertiesView:get_lua_prototype(element)
     local lua_prototype = {}
+    local attribute = string.gsub(element.type, "-", "_")
     pcall(function()
-        lua_prototype = prototypes[element.type][element.name]
+        lua_prototype = prototypes[attribute][element.name]
     end)
     return lua_prototype
 end
 
----Return attributes of classe
----@param object_name any
----@return unknown
-function PropertiesView:get_classe_attributes(object_name)
-    local runtime_api = Cache.get_data(self.classname, "runtime_api")
-    for _, value in pairs(runtime_api["classes"]) do
-        if value.name == object_name then
-            return value.attributes
-        end
-    end
-    return {}
-end
