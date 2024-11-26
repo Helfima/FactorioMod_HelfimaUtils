@@ -157,7 +157,7 @@ end
 ---@param parent LuaGuiElement
 ---@param element any
 function RuntimaApiView:format_element(parent, element)
-    GuiElement.add(parent, GuiLabel("label"):caption(element.name):style("frame_title"))
+    GuiElement.add(parent, GuiLabel("label"):caption(element.name):style(defines.mod.styles.label.frame_title))
     local textbox = GuiElement.add(parent, GuiLabel("description"):caption({"",element.description}):single_line(false))
     textbox.style.width = 900
 end
@@ -178,15 +178,101 @@ end
 ---@param parent LuaGuiElement
 ---@param element any
 function RuntimaApiView:format_method(parent, element)
+    if element.methods == nil or table_size(element.methods) == 0 then return end
+
+    local title = GuiElement.add(parent, GuiLabel("method-title"):caption("Methods:"):style(defines.mod.styles.label.bold))
+    title.style.padding = {5,10,5,10}
+
     for key, row in pairs(element.methods) do
-        local cell_row = GuiElement.add(parent, GuiFrame("method", row.name):style(defines.mod.styles.frame.colored.gray2))
+        local cell_member = GuiElement.add(parent, GuiFlowV())
+
+        local cell_row = GuiElement.add(cell_member, GuiFrame("method", row.name):style(defines.mod.styles.frame.colored.gray2))
         cell_row.style.horizontally_stretchable = true
         cell_row.style.vertically_stretchable = false
-        local cell_name = GuiElement.add(cell_row, GuiLabel(key, "name"):caption(row.name))
-        cell_name.style.width = 200
-        local cell_type = GuiElement.add(cell_row, GuiLabel(key, "type"):caption(row.type))
-        cell_type.style.width = 200
-        GuiElement.add(cell_row, GuiLabel(key, "description"):caption(row.description):single_line(false))
+        
+        -- member name
+        local tooltip = serpent.block(row)
+        local cell_name = GuiElement.add(cell_row, GuiLink(self.classname, "expand-member", row.name):caption(row.name):tooltip(tooltip):font_color(defines.color.brown.goldenrod))
+        cell_name.style.width = 400
+        -- member description
+        GuiElement.add(cell_row, GuiLabel("method-description"):caption(row.description):single_line(false))
+
+        local cell_detail = GuiElement.add(cell_member, GuiFrameV("detail"):style(defines.mod.styles.frame.colored.gray2))
+        cell_detail.style.horizontally_stretchable = true
+        cell_detail.style.vertically_stretchable = false
+        cell_detail.style.margin = {2,0,0,0}
+        cell_detail.style.padding = {0,0,0,10}
+        cell_detail.visible = true
+
+        if row.parameters ~= nil and table_size(row.parameters) > 0 then
+            GuiElement.add(cell_detail, GuiLabel("parameters"):caption("Parameters"):style(defines.mod.styles.label.heading_2))
+            local cell_frame = GuiElement.add(cell_detail, GuiFrameV("frame-parameters"):style(defines.mod.styles.frame.colored.gray3))
+            cell_frame.style.horizontally_stretchable = true
+            cell_frame.style.margin = {5,5,5,10}
+            cell_frame.style.padding = 4
+
+            for key, parameter in pairs(row.parameters) do
+                local cell_row = GuiElement.add(cell_frame, GuiFrame("parameter", key):style(defines.mod.styles.frame.colored.gray7))
+                cell_row.style.horizontally_stretchable = true
+                cell_row.style.vertically_stretchable = false
+                cell_row.style.margin = 0
+                cell_row.style.padding = 2
+                -- raise name
+                local cell_name = GuiElement.add(cell_row, GuiLabel("parameter-name"):caption(parameter.name))
+                cell_name.style.width = 200
+                -- return type
+                local cell_type = GuiElement.add(cell_row, GuiFlowH())
+                cell_type.style.width = 200
+                self:format_complex_type(cell_type, parameter.type, key)
+                -- raise description
+                GuiElement.add(cell_row, GuiLabel("parameter-description"):caption(parameter.description):single_line(false))
+            end
+        end
+
+        if row.return_values ~= nil and table_size(row.return_values) > 0 then
+            GuiElement.add(cell_detail, GuiLabel("return_values"):caption("Return values"):style(defines.mod.styles.label.heading_2))
+            local cell_frame = GuiElement.add(cell_detail, GuiFrameV("frame-return-value"):style(defines.mod.styles.frame.colored.gray4))
+            cell_frame.style.horizontally_stretchable = true
+            cell_frame.style.margin = {5,5,5,10}
+            cell_frame.style.padding = 4
+
+            for key, return_value in pairs(row.return_values) do
+                local cell_row = GuiElement.add(cell_frame, GuiFrame("return-value", key):style(defines.mod.styles.frame.colored.gray7))
+                cell_row.style.horizontally_stretchable = true
+                cell_row.style.vertically_stretchable = false
+                cell_row.style.margin = 0
+                cell_row.style.padding = 2
+                -- return type
+                local cell_type = GuiElement.add(cell_row, GuiFlowH())
+                cell_type.style.width = 400
+                self:format_complex_type(cell_type, return_value.type, key)
+                -- raise description
+                GuiElement.add(cell_row, GuiLabel("return-value-description"):caption(return_value.description):single_line(false))
+            end
+        end
+
+        if row.raises ~= nil and table_size(row.raises) > 0 then
+            GuiElement.add(cell_detail, GuiLabel("raises"):caption("Raised events"):style(defines.mod.styles.label.heading_2))
+            local cell_frame = GuiElement.add(cell_detail, GuiFrameV("frame-raises"):style(defines.mod.styles.frame.colored.gray4))
+            cell_frame.style.horizontally_stretchable = true
+            cell_frame.style.margin = {5,5,5,10}
+            cell_frame.style.padding = 4
+
+            for _, raise in pairs(row.raises) do
+                local cell_row = GuiElement.add(cell_frame, GuiFrame("raise", raise.name):style(defines.mod.styles.frame.colored.gray7))
+                cell_row.style.horizontally_stretchable = true
+                cell_row.style.vertically_stretchable = false
+                cell_row.style.margin = 0
+                cell_row.style.padding = 2
+                -- raise name
+                local cell_name = GuiElement.add(cell_row, GuiLabel("raise-name"):caption(raise.name))
+                cell_name.style.width = 400
+                -- raise description
+                GuiElement.add(cell_row, GuiLabel("raise-description"):caption(raise.description):single_line(false))
+            end
+        end
+
+        self:format_subclasses(cell_detail, row)
     end
 end
 
@@ -194,19 +280,61 @@ end
 ---On event
 ---@param parent LuaGuiElement
 ---@param element any
+function RuntimaApiView:format_parameters(parent, element)
+end
+-------------------------------------------------------------------------------
+---On event
+---@param parent LuaGuiElement
+---@param element any
 function RuntimaApiView:format_attribute(parent, element)
+    if element.attributes == nil or table_size(element.attributes) == 0 then return end
+
+    local title = GuiElement.add(parent, GuiLabel("attributes-title"):caption("Attributes:"):style(defines.mod.styles.label.bold))
+    title.style.padding = {5,10,5,10}
+
     for key, row in pairs(element.attributes) do
-        local cell_row = GuiElement.add(parent, GuiFrame("method", row.name):style(defines.mod.styles.frame.colored.gray2))
+        local cell_member = GuiElement.add(parent, GuiFlowV())
+
+        local cell_row = GuiElement.add(cell_member, GuiFrame("method", row.name):style(defines.mod.styles.frame.colored.gray2))
         cell_row.style.horizontally_stretchable = true
         cell_row.style.vertically_stretchable = false
+        -- member name
         local cell_name = GuiElement.add(cell_row, GuiLink(self.classname, "expand-member", row.name):caption(row.name):font_color(defines.color.brown.goldenrod))
         cell_name.style.minimal_width = 200
+        -- member type
         local cell_type = self:format_data_type(cell_row, row)
         cell_type.style.minimal_width = 200
+        -- memeber description
         GuiElement.add(cell_row, GuiLabel(key, "description"):caption(row.description):single_line(false))
+
+        local cell_detail = GuiElement.add(cell_member, GuiFrameV("detail"):style(defines.mod.styles.frame.colored.gray2))
+        cell_detail.style.horizontally_stretchable = true
+        cell_detail.style.vertically_stretchable = false
+        cell_detail.style.margin = {2,0,0,0}
+        cell_detail.style.padding = {0,0,0,10}
+        cell_detail.visible = false
+
+        self:format_subclasses(cell_detail, row)
     end
 end
 
+-------------------------------------------------------------------------------
+---On event
+---@param parent LuaGuiElement
+---@param element any
+function RuntimaApiView:format_subclasses(parent, element)
+    if element.subclasses ~= nil and table_size(element.subclasses) > 0 then
+        local info = nil
+        for _, subclasse in pairs(element.subclasses) do
+            if info ~= nil then
+                info = info .. " or " .. subclasse
+            else
+                info = subclasse
+            end
+        end
+        GuiElement.add(parent, GuiLabel("subclasses"):caption({"", "Can only be used if this is ", info}):font_color(defines.color.yellow.khaki))
+    end
+end
 -------------------------------------------------------------------------------
 ---On event
 ---@param parent LuaGuiElement
@@ -242,7 +370,26 @@ end
 ---@param parent LuaGuiElement
 ---@param element any
 function RuntimaApiView:format_complex_type(parent, element, index)
-    if element.complex_type == "array" then
+    if element.complex_type == "function" then
+        local cell_function = GuiElement.add(parent, GuiFlowH())
+        GuiElement.add(cell_function, GuiLabel("function-start", index):caption("function("))
+        for key, parameter in pairs(element.parameters) do
+            GuiElement.add(cell_function, GuiLink(self.classname, "follow-link", "concepts", parameter, key):caption(parameter))
+            if key > 1 then
+                GuiElement.add(cell_function, GuiLabel("function-separator", key):caption(","))
+            end
+        end
+        GuiElement.add(cell_function, GuiLabel("function-end", index):caption(")"))
+    elseif element.complex_type == "dictionary" then
+        local cell_dictionary = GuiElement.add(parent, GuiFlowH())
+        GuiElement.add(cell_dictionary, GuiLabel("dictionary-start", index):caption("dictionary["))
+        self:format_complex_type(cell_dictionary, element.key, 0)
+        GuiElement.add(cell_dictionary, GuiLabel("dictionary-separator", index):caption("->"))
+        self:format_complex_type(cell_dictionary, element.value, 1)
+        GuiElement.add(cell_dictionary, GuiLabel("dictionary-end", index):caption("]"))
+    elseif element.complex_type == "table" then
+        GuiElement.add(parent, GuiLabel("table", index):caption("table"))
+    elseif element.complex_type == "array" then
         GuiElement.add(parent, GuiLabel("array", index):caption("Array of "))
         local cell_array = GuiElement.add(parent, GuiFlowH())
         self:format_complex_type(cell_array, element.value, index)
@@ -261,9 +408,12 @@ function RuntimaApiView:format_complex_type(parent, element, index)
         local literal = string.format("\"%s\"", element.value)
         GuiElement.add(parent, GuiLabel("literal", index):caption(literal))
     elseif type(element) == "string" and string.find(element, "Lua",0,true) then
-        GuiElement.add(parent, GuiButton(self.classname, "follow-link", element):caption(element):style("helfima_lib_link2"))
+        GuiElement.add(parent, GuiLink(self.classname, "follow-link", "classes", element, index):caption(element))
+    elseif type(element) == "string" and string.find(element, "defines",0,true) then
+        local value = string.gsub(element, "defines.", "")
+        GuiElement.add(parent, GuiLink(self.classname, "follow-link", "defines", value, index):caption(value))
     elseif type(element) == "string" then
-        GuiElement.add(parent, GuiLabel("string", index):caption(element))
+        GuiElement.add(parent, GuiLink(self.classname, "follow-link", "concepts", element, index):caption(element))
     else
         GuiElement.add(parent, GuiLabel("unknown", index):caption("unknown"):color("red"))
     end
@@ -300,8 +450,10 @@ function RuntimaApiView:on_event(event)
     end
 
     if event.action == "expand-member" then
-        local cell_content = event.element.parent
-        local value = event.element.tags
+        local cell_content = event.element.parent.parent
+        if table.contains(cell_content.children_names, "detail")  then
+            cell_content["detail"].visible = not(cell_content["detail"].visible)
+        end
     end
 
     if event.action == "change-runtime-api" then
