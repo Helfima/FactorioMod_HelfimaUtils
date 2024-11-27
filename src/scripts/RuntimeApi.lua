@@ -24,6 +24,20 @@ function RuntimeApi.get_api()
 end
 
 -------------------------------------------------------------------------------
+---Set Runtime API
+---@param json string | table
+function RuntimeApi.set_api(json)
+    local api = json
+    if type(json) == "string" then
+        api = helpers.json_to_table(json)
+    end
+    --helpers.write_file("api.lua", serpent.block(api))
+    if api ~= nil then
+        Cache.set_data(RuntimeApi.classname, "runtime_api", api)
+    end
+end
+
+-------------------------------------------------------------------------------
 ---Return Runtime API
 ---@return any
 function RuntimeApi.get_sections()
@@ -68,26 +82,16 @@ function RuntimeApi.set_history(section, sub_section)
     return history
 end
 
--------------------------------------------------------------------------------
----Set Runtime API
----@param json_string string
-function RuntimeApi.set_api(json_string)
-    local api = helpers.json_to_table(json_string)
-    --helpers.write_file("api.lua", serpent.block(api))
-    if api ~= nil then
-        Cache.set_data(RuntimeApi.classname, "runtime_api", api)
-    end
-end
-
-
 ---Return classe
 ---@param object_name string
 ---@return any
 function RuntimeApi.get_classe(object_name)
     local runtime_api = Cache.get_data(RuntimeApi.classname, "runtime_api")
-    for _, value in pairs(runtime_api["classes"]) do
-        if value.name == object_name then
-            return value
+    if runtime_api ~= nil then
+        for _, value in pairs(runtime_api["classes"]) do
+            if value.name == object_name then
+                return value
+            end
         end
     end
     return nil
@@ -104,6 +108,18 @@ function RuntimeApi.get_classe_attributes(object_name)
         end
     end
     return {}
+end
+
+---comment
+---@param data ConfigurationChangedData
+function RuntimeApi.on_configuration_changed(data)
+end
+
+function RuntimeApi.on_init()
+    local api = RuntimeApi.get_api()
+    if api == nil then
+        RuntimeApi.set_api(source_api)
+    end
 end
 
 return RuntimeApi
