@@ -380,7 +380,7 @@ function RuntimaApiView:format_method_detail(parent, element)
 
     self:format_parameters(cell_detail, element)
     self:format_variant_parameter_groups(cell_detail, element)
-    self:format_return_values(parent, element)
+    self:format_return_values(cell_detail, element)
     
 
     if element.raises ~= nil and table_size(element.raises) > 0 then

@@ -173,7 +173,8 @@ function PropertiesView:update_properties_data(event)
             local value = attribute.values[key]
             local cell_content = GuiElement.add(table, GuiFlowH())
             if attribute.type == "sprite" then
-                GuiElement.add(cell_content, GuiButtonSprite(self.classname, "element-delete", key):sprite(value.type, value.name))
+                local button = GuiElement.add(cell_content, GuiButtonSprite(self.classname, "element-delete", key, "onbypass"):choose(value.type, value.name))
+                button.locked = true
             else
                 GuiElement.add(cell_content, GuiLabel("content"):caption(value))
             end
