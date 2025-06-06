@@ -82,7 +82,7 @@ function PropertiesView:update_properties_menu(event)
     cell_selector.style.horizontal_spacing = 5
 
 
-    local items = {"achievement","decorative","entity","equipment","fluid","item","item-group","recipe","signal","technology","tile","asteroid-chunk","space-location","item-with-quality","entity-with-quality","recipe-with-quality","equipment-with-quality"}
+    local items = {"achievement","decorative","entity","equipment","fluid","item","item-group","recipe","signal","technology","tile","surface","asteroid-chunk","space-location","item-with-quality","entity-with-quality","recipe-with-quality","equipment-with-quality"}
     local selected = User.get_parameter("type_choosed") or "item"
     GuiElement.add(cell_selector, GuiDropDown(self.classname, "type-choose"):items(items, selected))
 
@@ -172,11 +172,25 @@ function PropertiesView:update_properties_data(event)
         for key, _ in pairs(prototype_keys) do
             local value = attribute.values[key]
             local cell_content = GuiElement.add(table, GuiFlowH())
+            -- display icon
             if attribute.type == "sprite" then
-                local button = GuiElement.add(cell_content, GuiButtonSprite(self.classname, "element-delete", key, "onbypass"):choose(value.type, value.name))
-                button.locked = true
+                local element_type = value.type
+                local element_name = value.name
+                if element_type == "signal" then
+                    element_name = value.name.name
+                end
+                if element_type == "surface" then
+                    GuiElement.add(cell_content, GuiButton(self.classname, "element-delete", key, "onbypass", element_type, element_name):caption(value.name))
+                else
+                    local button = GuiElement.add(cell_content, GuiButtonSprite(self.classname, "element-delete", key, "onbypass"):choose(element_type, element_name))
+                    button.locked = true
+                end
             else
-                GuiElement.add(cell_content, GuiLabel("content"):caption(value))
+                local value_string = value
+                if value ~= nil and value.type == "virtual" then
+                    value_string = serpent.block(value)
+                end
+                GuiElement.add(cell_content, GuiLabel("content"):caption(value_string))
             end
         end
     end
@@ -291,7 +305,9 @@ end
 ---@return string
 function PropertiesView.get_key(element)
     local key = nil
-    if element.quality == nil then
+    if element.type == "signal" then
+        key = string.format("%s_%s_%s", element.type, element.name.type, element.name.name)
+    elseif element.quality == nil then
         key = string.format("%s_%s", element.type, element.name)
     else
         key = string.format("%s_%s_%s", element.type, element.name, element.quality)

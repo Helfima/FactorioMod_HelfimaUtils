@@ -1,9 +1,11 @@
 ---------------------------------------------------------------------------------------------------
 Version: 1.0.2
-Date: 2024-12-15
+Date: 2025-06-06
   Changes:
     - Modified icon element to see information
     - Updated source api 2.0.55
+    - Added signal selection
+    - Added surface selection
 ---------------------------------------------------------------------------------------------------
 Version: 1.0.1
 Date: 2024-11-27
