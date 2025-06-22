@@ -138,7 +138,7 @@ function PropertiesView:update_properties_data(event)
     end
 
     local prototype_keys = {}
-    local prototypes = {header={},attributes={}}
+    local prototypes = {header={},methods={},attributes={}}
     for key, element_choosed in pairs(elements_choosed) do
         prototype_keys[key] = true
         local prototype = self:get_data(element_choosed)
@@ -148,6 +148,13 @@ function PropertiesView:update_properties_data(event)
                 prototypes.header[attribute_key] = {name=attribute.name, attribute.description, type=attribute.type, values={}}
             end
             prototypes.header[attribute_key]["values"][key] = attribute.value
+        end
+        for _, method in pairs(prototype.methods) do
+            local method_key = method.name
+            if prototypes.methods[method_key] == nil then
+                prototypes.methods[method_key] = {name=method.name, method.description, type=method.type, values={}}
+            end
+            prototypes.methods[method_key]["values"][key] = method.value
         end
         for _, attribute in pairs(prototype.attributes) do
             local attribute_key = attribute.name
@@ -173,7 +180,9 @@ function PropertiesView:update_properties_data(event)
             local value = attribute.values[key]
             local cell_content = GuiElement.add(table, GuiFlowH())
             -- display icon
-            if attribute.type == "sprite" then
+            if attribute.type == "lua_prototype" then
+                GuiElement.add(cell_content, GuiLink(self.classname, "follow-link", "classes", value):caption(value))
+            elseif attribute.type == "sprite" then
                 local element_type = value.type
                 local element_name = value.name
                 if element_type == "signal" then
@@ -195,11 +204,13 @@ function PropertiesView:update_properties_data(event)
         end
     end
 
-    for _, attribute in spairs(prototypes.attributes, sorter) do
+    -- display methods
+    for _, attribute in spairs(prototypes.methods, sorter) do
         if not(User.get_parameter("filter_property_nil") and PropertiesView.values_is_nil(attribute.values)) and
         not(User.get_parameter("filter_property_diff") and PropertiesView.values_is_same(attribute.values)) then
             local cell_name = GuiElement.add(table, GuiFlowH())
-            GuiElement.add(cell_name, GuiLabel("content"):caption(attribute.name):tooltip(attribute.description):style(defines.mod.styles.label.heading_2))
+            local caption = string.format("%s(...)", attribute.name)
+            GuiElement.add(cell_name, GuiLabel("content"):caption(caption):tooltip(attribute.description):style(defines.mod.styles.label.heading_2):font_color(defines.color.brown.goldenrod))
             if attribute.description ~= nil and attribute.description ~= '' then
                 local sprite = GuiElement.add(cell_name, GuiSprite("info"):sprite("menu", defines.sprites.status_information.white):tooltip(attribute.description))
                 sprite.style.size = 15
@@ -215,6 +226,121 @@ function PropertiesView:update_properties_data(event)
                 self:update_attribute_value(table, value)
             end
         end
+    end
+
+    -- display attributes
+    for _, attribute in spairs(prototypes.attributes, sorter) do
+        if not(User.get_parameter("filter_property_nil") and PropertiesView.values_is_nil(attribute.values)) and
+        not(User.get_parameter("filter_property_diff") and PropertiesView.values_is_same(attribute.values)) then
+            local cell_name = GuiElement.add(table, GuiFlowH())
+            local caption = string.format("%s", attribute.name)
+            GuiElement.add(cell_name, GuiLabel("content"):caption(caption):tooltip(attribute.description):style(defines.mod.styles.label.heading_2):font_color(defines.color.white.snow))
+            if attribute.description ~= nil and attribute.description ~= '' then
+                local sprite = GuiElement.add(cell_name, GuiSprite("info"):sprite("menu", defines.sprites.status_information.white):tooltip(attribute.description))
+                sprite.style.size = 15
+                sprite.style.stretch_image_to_widget_size = true
+                sprite.style.margin = 5
+            end
+            
+            local cell_type = GuiElement.add(table, GuiFlowH())
+            self:format_complex_type(cell_type,attribute.type)
+            --GuiElement.add(cell_type, GuiLabel("content"):caption(attribute.type))
+            
+            for key, _ in pairs(prototype_keys) do
+                local value = attribute.values[key]
+                self:update_attribute_value(table, value)
+            end
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
+---Format complex type
+---@param parent LuaGuiElement
+---@param element any
+---@param index? number
+function PropertiesView:format_complex_type(parent, element, index)
+    if element.complex_type == "function" then
+        -- function
+        local cell_function = GuiElement.add(parent, GuiFlowH())
+        GuiElement.add(cell_function, GuiLabel("function-start", index):caption("function("))
+        for key, parameter in pairs(element.parameters) do
+            GuiElement.add(cell_function, GuiLink(self.classname, "follow-link", "concepts", parameter, key):caption(parameter))
+            if key > 1 then
+                GuiElement.add(cell_function, GuiLabel("function-separator", key):caption(","))
+            end
+        end
+        GuiElement.add(cell_function, GuiLabel("function-end", index):caption(")"))
+    elseif element.complex_type == "dictionary" then
+        -- dictionary
+        local cell_dictionary = GuiElement.add(parent, GuiFlowH())
+        GuiElement.add(cell_dictionary, GuiLabel("dictionary-start", index):caption("dictionary["))
+        self:format_complex_type(cell_dictionary, element.key, 0)
+        GuiElement.add(cell_dictionary, GuiLabel("dictionary-separator", index):caption("->"))
+        self:format_complex_type(cell_dictionary, element.value, 1)
+        GuiElement.add(cell_dictionary, GuiLabel("dictionary-end", index):caption("]"))
+    elseif element.complex_type == "table" then
+        -- table
+        GuiElement.add(parent, GuiLabel("table", index):caption("table"))
+    elseif element.complex_type == "builtin" then
+        -- table
+        GuiElement.add(parent, GuiLabel("builtin", index):caption("{}"))
+    elseif element.complex_type == "LuaStruct" then
+        -- table
+        GuiElement.add(parent, GuiLabel("LuaStruct", index):caption("LuaStruct"))
+    elseif element.complex_type == "array" then
+        -- array
+        GuiElement.add(parent, GuiLabel("array", index):caption("Array of "))
+        local cell_array = GuiElement.add(parent, GuiFlowH())
+        self:format_complex_type(cell_array, element.value, index)
+    elseif element.complex_type == "union" then
+        -- union
+        local direction = element.union_direction or defines.mod.direction.vertical
+        local flow = GuiFlowH()
+        if direction == defines.mod.direction.vertical then
+            flow = GuiFlowV()
+        end
+        local cell_union = GuiElement.add(parent, flow)
+        local append_operator = false
+        for option_index, option in pairs(element.options) do
+            if append_operator then
+                local operator = GuiElement.add(cell_union, GuiLabel("operator", option_index):caption("or"))
+                operator.style.padding = {0,2,0,2}
+            end
+            self:format_complex_type(cell_union, option, option_index)
+            append_operator = true
+        end
+    elseif element.complex_type == "tuple" then
+        -- tuple
+        local cell_tuple = GuiElement.add(parent, GuiFlowH())
+        GuiElement.add(cell_tuple, GuiLabel("tuple-start", index):caption("{"))
+        for key, value in pairs(element.values) do
+            if key > 1 then
+                GuiElement.add(cell_tuple, GuiLabel("tuple-separator", key):caption(", "))
+            end
+            self:format_complex_type(cell_tuple, value, key)
+        end
+        GuiElement.add(cell_tuple, GuiLabel("tuple-end", index):caption("}"))
+    elseif element.complex_type == "type" then
+        -- type
+        self:format_complex_type(parent, element.value, index)
+    elseif element.complex_type == "literal" then
+        -- literal
+        local literal = string.format("\"%s\"", element.value)
+        GuiElement.add(parent, GuiLabel("literal", index):caption(literal))
+    elseif type(element) == "string" and string.find(element, "Lua",0,true) then
+        -- classes
+        GuiElement.add(parent, GuiLink(self.classname, "follow-link", "classes", element, index):caption(element))
+    elseif type(element) == "string" and string.find(element, "defines",0,true) then
+        -- defines
+        local value = string.gsub(element, "defines.", "")
+        GuiElement.add(parent, GuiLink(self.classname, "follow-link", "defines", value, index):caption(value))
+    elseif type(element) == "string" then
+        -- string
+        GuiElement.add(parent, GuiLink(self.classname, "follow-link", "concepts", element, index):caption(element))
+    else
+        -- unknown
+        GuiElement.add(parent, GuiLabel("unknown", index):caption("unknown"):color("red"))
     end
 end
 
@@ -380,8 +506,8 @@ end
 function PropertiesView:on_event(event)
 
     if event.action == "follow-link" then
-        local information = {section="classes", sub_section=event.item1}
-        Dispatcher:send(defines.mod.events.on_gui_open, {sender=self.classname, information=information}, "RuntimaApiView")
+        Dispatcher:send(defines.mod.events.on_gui_open, event, "RuntimaApiView")
+        Dispatcher:send(defines.mod.events.on_gui_event, event, "RuntimaApiView")
     end
     
     if event.action == "expand-content" then
@@ -435,22 +561,36 @@ function PropertiesView:on_event(event)
 end
 
 function PropertiesView:get_data(element_choosed)
-    local prototype = {header={},attributes={}}
+    local prototype = {header={},methods={},attributes={}}
     table.insert(prototype.header, self:get_attribute_data("icon", nil, "sprite", element_choosed))
     table.insert(prototype.header, self:get_attribute_data("type", nil, "string", element_choosed.type))
     table.insert(prototype.header, self:get_attribute_data("name", nil, "string", element_choosed.name))
     table.insert(prototype.header, self:get_attribute_data("quality", nil, "string", element_choosed.quality))
 
     local lua_prototype= self:get_lua_prototype(element_choosed)
-    table.insert(prototype.header, self:get_attribute_data("lua_prototype", nil, "string", lua_prototype.object_name))
+    table.insert(prototype.header, self:get_attribute_data("lua_prototype", nil, "lua_prototype", lua_prototype.object_name))
     local lua_classe = RuntimeApi.get_classe(lua_prototype.object_name)
     while lua_classe ~= nil do
+        for _, lua_method in pairs(lua_classe.methods) do
+            local content = nil
+            pcall(function()
+                content = lua_prototype[lua_method.name]()
+            end)
+            local content_type = type(content)
+            if lua_method.return_values ~= nil and lua_method.return_values[1] ~= nil then
+                content_type = lua_method.return_values[1].type
+            end
+            table.insert(prototype.methods, self:get_attribute_data(lua_method.name, lua_method.description, content_type,content))
+        end
         for _, lua_attribute in pairs(lua_classe.attributes) do
             local content = nil
             pcall(function()
                 content = lua_prototype[lua_attribute.name]
             end)
             local content_type = type(content)
+            if lua_attribute.read_type ~= nil then
+                content_type = lua_attribute.read_type
+            end
             table.insert(prototype.attributes, self:get_attribute_data(lua_attribute.name, lua_attribute.description, content_type,content))
         end
         lua_classe = RuntimeApi.get_classe(lua_classe.parent)
