@@ -219,7 +219,7 @@ function PropertiesView:update_properties_data(event)
             end
             
             local cell_type = GuiElement.add(table, GuiFlowH())
-            GuiElement.add(cell_type, GuiLabel("content"):caption(attribute.type))
+             self:format_complex_type(cell_type, attribute.type)
             
             for key, _ in pairs(prototype_keys) do
                 local value = attribute.values[key]
@@ -243,7 +243,7 @@ function PropertiesView:update_properties_data(event)
             end
             
             local cell_type = GuiElement.add(table, GuiFlowH())
-            self:format_complex_type(cell_type,attribute.type)
+            self:format_complex_type(cell_type, attribute.type)
             --GuiElement.add(cell_type, GuiLabel("content"):caption(attribute.type))
             
             for key, _ in pairs(prototype_keys) do
