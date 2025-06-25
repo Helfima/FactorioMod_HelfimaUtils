@@ -40,7 +40,7 @@ end
 -------------------------------------------------------------------------------
 ---On initialization
 function RuntimaApiView:on_init()
-    self.panel_caption = { "HelfimaUtils.runtime-api-title" }
+    self.panel_caption = { "", { "HelfimaUtils.runtime-api-title" }, " ", script.active_mods["HelfimaUtils"] }
 end
 
 -------------------------------------------------------------------------------

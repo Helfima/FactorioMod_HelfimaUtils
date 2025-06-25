@@ -24,7 +24,7 @@ end
 -------------------------------------------------------------------------------
 ---On initialization
 function PropertiesView:on_init()
-    self.panel_caption = { "HelfimaUtils.properties-title" }
+    self.panel_caption = { "", {"HelfimaUtils.properties-title"}, " ", script.active_mods["HelfimaUtils"] }
 end
 
 -------------------------------------------------------------------------------
@@ -129,6 +129,7 @@ end
 ---@param event EventModData
 function PropertiesView:update_properties_data(event)
     local content_panel = self:get_scroll_panel("data")
+    content_panel.clear()
 
     local elements_choosed = User.get_parameter("elements_choosed") or {}
 
@@ -204,51 +205,56 @@ function PropertiesView:update_properties_data(event)
         end
     end
 
+    local filter_value = User.get_parameter("filter_property")
     -- display methods
     for _, attribute in spairs(prototypes.methods, sorter) do
-        if not(User.get_parameter("filter_property_nil") and PropertiesView.values_is_nil(attribute.values)) and
-        not(User.get_parameter("filter_property_diff") and PropertiesView.values_is_same(attribute.values)) then
-            local cell_name = GuiElement.add(table, GuiFlowH())
-            local caption = string.format("%s(...)", attribute.name)
-            GuiElement.add(cell_name, GuiLabel("content"):caption(caption):tooltip(attribute.description):style(defines.mod.styles.label.heading_2):font_color(defines.color.brown.goldenrod))
-            if attribute.description ~= nil and attribute.description ~= '' then
-                local sprite = GuiElement.add(cell_name, GuiSprite("info"):sprite("menu", defines.sprites.status_information.white):tooltip(attribute.description))
-                sprite.style.size = 15
-                sprite.style.stretch_image_to_widget_size = true
-                sprite.style.margin = 5
-            end
-            
-            local cell_type = GuiElement.add(table, GuiFlowH())
-             self:format_complex_type(cell_type, attribute.type)
-            
-            for key, _ in pairs(prototype_keys) do
-                local value = attribute.values[key]
-                self:update_attribute_value(table, value)
+        if filter_value == nil or string.find(attribute.name,filter_value) then
+            if not(User.get_parameter("filter_property_nil") and PropertiesView.values_is_nil(attribute.values)) and
+            not(User.get_parameter("filter_property_diff") and PropertiesView.values_is_same(attribute.values)) then
+                local cell_name = GuiElement.add(table, GuiFlowH())
+                local caption = string.format("%s(...)", attribute.name)
+                GuiElement.add(cell_name, GuiLabel("content"):caption(caption):tooltip(attribute.description):style(defines.mod.styles.label.heading_2):font_color(defines.color.brown.goldenrod))
+                if attribute.description ~= nil and attribute.description ~= '' then
+                    local sprite = GuiElement.add(cell_name, GuiSprite("info"):sprite("menu", defines.sprites.status_information.white):tooltip(attribute.description))
+                    sprite.style.size = 15
+                    sprite.style.stretch_image_to_widget_size = true
+                    sprite.style.margin = 5
+                end
+                
+                local cell_type = GuiElement.add(table, GuiFlowH())
+                self:format_complex_type(cell_type, attribute.type)
+                
+                for key, _ in pairs(prototype_keys) do
+                    local value = attribute.values[key]
+                    self:update_attribute_value(table, value)
+                end
             end
         end
     end
 
     -- display attributes
     for _, attribute in spairs(prototypes.attributes, sorter) do
-        if not(User.get_parameter("filter_property_nil") and PropertiesView.values_is_nil(attribute.values)) and
-        not(User.get_parameter("filter_property_diff") and PropertiesView.values_is_same(attribute.values)) then
-            local cell_name = GuiElement.add(table, GuiFlowH())
-            local caption = string.format("%s", attribute.name)
-            GuiElement.add(cell_name, GuiLabel("content"):caption(caption):tooltip(attribute.description):style(defines.mod.styles.label.heading_2):font_color(defines.color.white.snow))
-            if attribute.description ~= nil and attribute.description ~= '' then
-                local sprite = GuiElement.add(cell_name, GuiSprite("info"):sprite("menu", defines.sprites.status_information.white):tooltip(attribute.description))
-                sprite.style.size = 15
-                sprite.style.stretch_image_to_widget_size = true
-                sprite.style.margin = 5
-            end
-            
-            local cell_type = GuiElement.add(table, GuiFlowH())
-            self:format_complex_type(cell_type, attribute.type)
-            --GuiElement.add(cell_type, GuiLabel("content"):caption(attribute.type))
-            
-            for key, _ in pairs(prototype_keys) do
-                local value = attribute.values[key]
-                self:update_attribute_value(table, value)
+        if filter_value == nil or string.find(attribute.name,filter_value) then
+            if not(User.get_parameter("filter_property_nil") and PropertiesView.values_is_nil(attribute.values)) and
+            not(User.get_parameter("filter_property_diff") and PropertiesView.values_is_same(attribute.values)) then
+                local cell_name = GuiElement.add(table, GuiFlowH())
+                local caption = string.format("%s", attribute.name)
+                GuiElement.add(cell_name, GuiLabel("content"):caption(caption):tooltip(attribute.description):style(defines.mod.styles.label.heading_2):font_color(defines.color.white.snow))
+                if attribute.description ~= nil and attribute.description ~= '' then
+                    local sprite = GuiElement.add(cell_name, GuiSprite("info"):sprite("menu", defines.sprites.status_information.white):tooltip(attribute.description))
+                    sprite.style.size = 15
+                    sprite.style.stretch_image_to_widget_size = true
+                    sprite.style.margin = 5
+                end
+                
+                local cell_type = GuiElement.add(table, GuiFlowH())
+                self:format_complex_type(cell_type, attribute.type)
+                --GuiElement.add(cell_type, GuiLabel("content"):caption(attribute.type))
+                
+                for key, _ in pairs(prototype_keys) do
+                    local value = attribute.values[key]
+                    self:update_attribute_value(table, value)
+                end
             end
         end
     end
@@ -557,6 +563,12 @@ function PropertiesView:on_event(event)
         local parameter_name = string.format("filter_property_%s", event.item1)
         User.set_parameter(parameter_name, switch_nil)
         Dispatcher:send(defines.mod.events.on_gui_update, nil, self.classname)
+    end
+
+    if event.action == "filter-property" then
+        local filter_value = event.element.text
+        User.set_parameter("filter_property", filter_value)
+        self:update_properties_data(event)
     end
 end
 

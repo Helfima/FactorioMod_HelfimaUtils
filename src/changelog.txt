@@ -1,4 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Version: 1.0.4
+Date: 2025-06-25
+  Changes:
+    - Added mode version in the header of panels
+  Bugfixes:
+    - Fixed filter textbox in the properties view
+---------------------------------------------------------------------------------------------------
 Version: 1.0.3
 Date: 2025-06-22
   Changes:
