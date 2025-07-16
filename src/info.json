@@ -1,11 +1,11 @@
 {
   "name": "HelfimaUtils",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "title": "Helfima Utils",
   "author": "Helfima",
   "contact": "",
   "homepage": "https://github.com/Helfima/FactorioMod_HelfimaUtils",
   "description": "This a tool to see information on LuaObject and Runtime API.",
-  "dependencies": ["base >= 2.0.21", "HelfimaLib >= 2.0.2"],
+  "dependencies": ["base >= 2.0.21", "HelfimaLib >= 2.0.4"],
   "factorio_version": "2.0"
 }

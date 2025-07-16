@@ -82,7 +82,8 @@ function PropertiesView:update_properties_menu(event)
     cell_selector.style.horizontal_spacing = 5
 
 
-    local items = {"achievement","decorative","entity","equipment","fluid","item","item-group","recipe","signal","technology","tile","surface","asteroid-chunk","space-location","item-with-quality","entity-with-quality","recipe-with-quality","equipment-with-quality"}
+    local items = {"achievement","decorative","entity","equipment","fluid","item","item-group","recipe","signal","technology","tile","surface"
+                    ,"quality","asteroid-chunk","space-location","item-with-quality","entity-with-quality","recipe-with-quality","equipment-with-quality"}
     local selected = User.get_parameter("type_choosed") or "item"
     GuiElement.add(cell_selector, GuiDropDown(self.classname, "type-choose"):items(items, selected))
 
@@ -186,11 +187,15 @@ function PropertiesView:update_properties_data(event)
             elseif attribute.type == "sprite" then
                 local element_type = value.type
                 local element_name = value.name
+                local element_localised_name = value.localised_name
                 if element_type == "signal" then
                     element_name = value.name.name
                 end
                 if element_type == "surface" then
                     GuiElement.add(cell_content, GuiButton(self.classname, "element-delete", key, "onbypass", element_type, element_name):caption(value.name))
+                elseif element_type == "quality" then
+                    local style = defines.mod.styles.button.select_icon
+                    GuiElement.add(cell_content, GuiButton(self.classname, "element-delete", key, "onbypass", element_type, element_name):sprite("quality", element_name):style(style):tooltip(element_localised_name))
                 else
                     local button = GuiElement.add(cell_content, GuiButtonSprite(self.classname, "element-delete", key, "onbypass"):choose(element_type, element_name))
                     button.locked = true
@@ -226,7 +231,7 @@ function PropertiesView:update_properties_data(event)
                 
                 for key, _ in pairs(prototype_keys) do
                     local value = attribute.values[key]
-                    self:update_attribute_value(table, value)
+                    self:update_attribute_cell(table, value)
                 end
             end
         end
@@ -253,13 +258,24 @@ function PropertiesView:update_properties_data(event)
                 
                 for key, _ in pairs(prototype_keys) do
                     local value = attribute.values[key]
-                    self:update_attribute_value(table, value)
+                    self:update_attribute_cell(table, value)
                 end
             end
         end
     end
 end
 
+function PropertiesView:update_attribute_cell(table, value)
+    local cell_content = GuiElement.add(table, GuiFlowH())
+    local copy_value = self:get_copy_value(value)
+    local action = "copy-content"
+    if type(value) == "userdata" then
+        action = "copy-userdata"
+    end
+    local button = GuiElement.add(cell_content, GuiButton(self.classname, action):tags({value=copy_value}):sprite("menu", defines.sprites.copy.black, defines.sprites.copy.black):style("helmod_button_menu_sm"))
+    button.style.right_margin = 3
+    self:update_attribute_value(cell_content, value)
+end
 -------------------------------------------------------------------------------
 ---Format complex type
 ---@param parent LuaGuiElement
@@ -391,6 +407,71 @@ function PropertiesView:update_attribute_value(table, value)
     else
         GuiElement.add(cell_content, GuiLabel("content"):caption(value or ""))
     end
+end
+
+function PropertiesView:get_copy_value(value)
+    local value_type = type(value)
+    if value_type == "userdata" then
+        return self:get_userdata(value)
+    elseif value_type == "table" then
+        return self:get_copy_table(value)
+    else
+        return value
+    end
+end
+
+function PropertiesView:get_copy_table(table)
+    local data = {}
+    for key, value in pairs(table) do
+        local content_type = type(value)
+        if content_type == "userdata" then
+            local data_parse = self:get_userdata(value)
+            data[key] = self:get_copy_userdata(data_parse)
+        elseif content_type == "table" then
+            local size = table_size(value)
+            if size == 0 then
+                data[key] = {}
+            else
+                data[key] = self:get_copy_table(value)
+            end
+        else
+            data[key] = value
+        end
+    end
+    return data
+end
+
+function PropertiesView:get_copy_userdata(value)
+    local data = {}
+    local sorter = function(t, a, b) return t[b]["name"] > t[a]["name"] end
+    for _, attribute in spairs(value.attributes, sorter) do
+        if attribute.value ~= nil then
+            data[attribute.name] = attribute.value
+        end
+    end
+    return data
+end
+
+function PropertiesView:update_attribute_copy(parent, content)
+    local textbox = GuiElement.add(parent, GuiTextBox("copy"))
+    textbox.style.height = 50
+    local content_type = type(content)
+    if content_type == "table" then
+        local data = self:get_copy_table(content)
+        textbox.text = helpers.table_to_json(data)
+    else
+        textbox.text = tostring(content)
+    end
+    
+end
+
+function PropertiesView:update_userdata_copy(parent, content)
+    local textbox = GuiElement.add(parent, GuiTextBox("copy"))
+    textbox.style.height = 50
+
+    local data = self:get_copy_userdata(content)
+    local value = helpers.table_to_json(data)
+    textbox.text = value
 end
 
 function PropertiesView:update_attribute_table(parent, content)
@@ -530,6 +611,20 @@ function PropertiesView:on_event(event)
         self:update_userdata(cell_content, value)
     end
 
+    if event.action == "copy-content" then
+        local cell_content = event.element.parent
+        local value = event.element.tags.value
+        cell_content.clear()
+        self:update_attribute_copy(cell_content, value)
+    end
+
+    if event.action == "copy-userdata" then
+        local cell_content = event.element.parent
+        local value = event.element.tags.value
+        cell_content.clear()
+        self:update_userdata_copy(cell_content, value)
+    end
+
     if event.action == "type-choose" then
         local dropdown = event.element
         local type_choosed = dropdown.get_item(dropdown.selected_index)
@@ -580,32 +675,34 @@ function PropertiesView:get_data(element_choosed)
     table.insert(prototype.header, self:get_attribute_data("quality", nil, "string", element_choosed.quality))
 
     local lua_prototype= self:get_lua_prototype(element_choosed)
-    table.insert(prototype.header, self:get_attribute_data("lua_prototype", nil, "lua_prototype", lua_prototype.object_name))
-    local lua_classe = RuntimeApi.get_classe(lua_prototype.object_name)
-    while lua_classe ~= nil do
-        for _, lua_method in pairs(lua_classe.methods) do
-            local content = nil
-            pcall(function()
-                content = lua_prototype[lua_method.name]()
-            end)
-            local content_type = type(content)
-            if lua_method.return_values ~= nil and lua_method.return_values[1] ~= nil then
-                content_type = lua_method.return_values[1].type
+    if lua_prototype ~= nil then
+        table.insert(prototype.header, self:get_attribute_data("lua_prototype", nil, "lua_prototype", lua_prototype.object_name))
+        local lua_classe = RuntimeApi.get_classe(lua_prototype.object_name)
+        while lua_classe ~= nil do
+            for _, lua_method in pairs(lua_classe.methods) do
+                local content = nil
+                pcall(function()
+                    content = lua_prototype[lua_method.name]()
+                end)
+                local content_type = type(content)
+                if lua_method.return_values ~= nil and lua_method.return_values[1] ~= nil then
+                    content_type = lua_method.return_values[1].type
+                end
+                table.insert(prototype.methods, self:get_attribute_data(lua_method.name, lua_method.description, content_type,content))
             end
-            table.insert(prototype.methods, self:get_attribute_data(lua_method.name, lua_method.description, content_type,content))
-        end
-        for _, lua_attribute in pairs(lua_classe.attributes) do
-            local content = nil
-            pcall(function()
-                content = lua_prototype[lua_attribute.name]
-            end)
-            local content_type = type(content)
-            if lua_attribute.read_type ~= nil then
-                content_type = lua_attribute.read_type
+            for _, lua_attribute in pairs(lua_classe.attributes) do
+                local content = nil
+                pcall(function()
+                    content = lua_prototype[lua_attribute.name]
+                end)
+                local content_type = type(content)
+                if lua_attribute.read_type ~= nil then
+                    content_type = lua_attribute.read_type
+                end
+                table.insert(prototype.attributes, self:get_attribute_data(lua_attribute.name, lua_attribute.description, content_type,content))
             end
-            table.insert(prototype.attributes, self:get_attribute_data(lua_attribute.name, lua_attribute.description, content_type,content))
+            lua_classe = RuntimeApi.get_classe(lua_classe.parent)
         end
-        lua_classe = RuntimeApi.get_classe(lua_classe.parent)
     end
     return prototype
 end

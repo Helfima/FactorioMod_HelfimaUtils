@@ -1,4 +1,17 @@
 ---------------------------------------------------------------------------------------------------
+Version: 1.0.6
+Date: 2025-07-16
+  Changes:
+    - Updated source api 2.0.60
+    - Added quality selection
+  Bugfixes:
+    - Fixed LuaCustomTable complex_type implementation
+---------------------------------------------------------------------------------------------------
+Version: 1.0.5
+Date: 2025-07-10
+  Changes:
+    - Added a copy button to change cell by textbox with string value
+---------------------------------------------------------------------------------------------------
 Version: 1.0.4
 Date: 2025-06-25
   Changes:

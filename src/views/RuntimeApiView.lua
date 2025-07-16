@@ -648,7 +648,7 @@ function RuntimaApiView:format_complex_type(parent, element, index)
             end
         end
         GuiElement.add(cell_function, GuiLabel("function-end", index):caption(")"))
-    elseif element.complex_type == "dictionary" then
+    elseif element.complex_type == "dictionary"then
         -- dictionary
         local cell_dictionary = GuiElement.add(parent, GuiFlowH())
         GuiElement.add(cell_dictionary, GuiLabel("dictionary-start", index):caption("dictionary["))
@@ -656,6 +656,15 @@ function RuntimaApiView:format_complex_type(parent, element, index)
         GuiElement.add(cell_dictionary, GuiLabel("dictionary-separator", index):caption("->"))
         self:format_complex_type(cell_dictionary, element.value, 1)
         GuiElement.add(cell_dictionary, GuiLabel("dictionary-end", index):caption("]"))
+    elseif element.complex_type == "LuaCustomTable" then
+        -- dictionary
+        local cell_LuaCustomTable = GuiElement.add(parent, GuiFlowH())
+        GuiElement.add(cell_LuaCustomTable, GuiLink(self.classname, "follow-link", "classes", "LuaCustomTable"):caption("LuaCustomTable"))
+        GuiElement.add(cell_LuaCustomTable, GuiLabel("dictionary-start", index):caption("["))
+        self:format_complex_type(cell_LuaCustomTable, element.key, 0)
+        GuiElement.add(cell_LuaCustomTable, GuiLabel("dictionary-separator", index):caption("->"))
+        self:format_complex_type(cell_LuaCustomTable, element.value, 1)
+        GuiElement.add(cell_LuaCustomTable, GuiLabel("dictionary-end", index):caption("]"))
     elseif element.complex_type == "table" then
         -- table
         GuiElement.add(parent, GuiLabel("table", index):caption("table"))
