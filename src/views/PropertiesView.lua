@@ -92,7 +92,7 @@ function PropertiesView:update_properties_menu(event)
 
     -- filter
     GuiElement.add(left_flow, GuiLabel("filter-property-label"):caption("Filter:"))
-    local filter_value = User.get_parameter("filter-property")
+    local filter_value = User.get_parameter("filter_property")
     local filter_field = GuiElement.add(left_flow, GuiTextField(self.classname, "filter-property", "onchange"):text(filter_value))
     filter_field.style.width = 300
     
@@ -272,7 +272,8 @@ function PropertiesView:update_attribute_cell(table, value)
     if type(value) == "userdata" then
         action = "copy-userdata"
     end
-    local button = GuiElement.add(cell_content, GuiButton(self.classname, action):tags({value=copy_value}):sprite("menu", defines.sprites.copy.black, defines.sprites.copy.black):style("helmod_button_menu_sm"))
+    local button = GuiElement.add(cell_content, GuiButton(self.classname, action):sprite("menu", defines.sprites.copy.black, defines.sprites.copy.black):style(defines.mod.styles.button.menu_sm))
+    button.tags = {value=copy_value}
     button.style.right_margin = 3
     self:update_attribute_value(cell_content, value)
 end
@@ -287,7 +288,7 @@ function PropertiesView:format_complex_type(parent, element, index)
         local cell_function = GuiElement.add(parent, GuiFlowH())
         GuiElement.add(cell_function, GuiLabel("function-start", index):caption("function("))
         for key, parameter in pairs(element.parameters) do
-            GuiElement.add(cell_function, GuiLink(self.classname, "follow-link", "concepts", parameter, key):caption(parameter))
+            GuiElement.add(cell_function, GuiLink(self.classname, "follow-link", "concepts", parameter, key):caption(tostring(parameter)))
             if key > 1 then
                 GuiElement.add(cell_function, GuiLabel("function-separator", key):caption(","))
             end
@@ -374,12 +375,22 @@ function PropertiesView:update_userdata(parent, content)
     for _, attribute in spairs(content.attributes, sorter) do
         if attribute.value ~= nil then
             local cell_name = GuiElement.add(table, GuiFlowH())
-            GuiElement.add(cell_name, GuiLabel("content"):caption(attribute.name):tooltip(attribute.description):font_color(defines.color.purple.violet))
+            GuiElement.add(cell_name, GuiLabel("content"):caption(tostring(attribute.name)):tooltip(attribute.description):font_color(defines.color.purple.violet))
             
-            local cell_type = GuiElement.add(table, GuiFlowH())
-            GuiElement.add(cell_type, GuiLabel("content"):caption(attribute.type))
             
-            self:update_attribute_value(table, attribute.value)
+            if attribute.type == "userdata" then
+                local cell_type = GuiElement.add(table, GuiFlowH())
+                local object_name = attribute.object_name
+                GuiElement.add(cell_type, GuiLink(self.classname, "follow-link", "classes", object_name):caption(object_name))
+
+                local cell_content = GuiElement.add(table, GuiFlowH())
+                self:update_userdata(cell_content, attribute.value)
+            else
+                local cell_type = GuiElement.add(table, GuiFlowH())
+                GuiElement.add(cell_type, GuiLabel("content"):caption(tostring(attribute.type)))
+
+                self:update_attribute_value(table, attribute.value)
+            end
         end
     end
 end
@@ -405,7 +416,7 @@ function PropertiesView:update_attribute_value(table, value)
             GuiElement.add(cell_content, GuiLabel("content"):caption("false"))
         end
     else
-        GuiElement.add(cell_content, GuiLabel("content"):caption(value or ""))
+        GuiElement.add(cell_content, GuiLabel("content"):caption(tostring(value) or ""))
     end
 end
 
@@ -672,7 +683,9 @@ function PropertiesView:get_data(element_choosed)
     table.insert(prototype.header, self:get_attribute_data("icon", nil, "sprite", element_choosed))
     table.insert(prototype.header, self:get_attribute_data("type", nil, "string", element_choosed.type))
     table.insert(prototype.header, self:get_attribute_data("name", nil, "string", element_choosed.name))
-    table.insert(prototype.header, self:get_attribute_data("quality", nil, "string", element_choosed.quality))
+    pcall(function()
+        table.insert(prototype.header, self:get_attribute_data("quality", nil, "string", element_choosed.quality))
+    end)
 
     local lua_prototype= self:get_lua_prototype(element_choosed)
     if lua_prototype ~= nil then
@@ -699,7 +712,7 @@ function PropertiesView:get_data(element_choosed)
                 if lua_attribute.read_type ~= nil then
                     content_type = lua_attribute.read_type
                 end
-                table.insert(prototype.attributes, self:get_attribute_data(lua_attribute.name, lua_attribute.description, content_type,content))
+                table.insert(prototype.attributes, self:get_attribute_data(lua_attribute.name, lua_attribute.description, content_type, content))
             end
             lua_classe = RuntimeApi.get_classe(lua_classe.parent)
         end
@@ -724,8 +737,13 @@ function PropertiesView:get_userdata(lua_prototype)
     return prototype
 end
 
-function PropertiesView:get_attribute_data(name, description, type, value)
-    local attribute_data = {name=name, description=description, type=type, value=value}
+function PropertiesView:get_attribute_data(name, description, attr_type, value)
+    local object_name = nil
+    if attr_type == "userdata" then
+        object_name = value.object_name
+        value = self:get_data(value)
+    end
+    local attribute_data = {name=name, description=description, type=attr_type, object_name=object_name, value=value}
     return attribute_data
 end
 
