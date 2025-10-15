@@ -205,7 +205,8 @@ function PropertiesView:update_properties_data(event)
                 if value ~= nil and value.type == "virtual" then
                     value_string = serpent.block(value)
                 end
-                GuiElement.add(cell_content, GuiLabel("content"):caption(value_string))
+                self:update_attribute_cell(cell_content, value_string)
+                --GuiElement.add(cell_content, GuiLabel("content"):caption(value_string))
             end
         end
     end
@@ -678,28 +679,64 @@ function PropertiesView:on_event(event)
     end
 end
 
+function PropertiesView:get_property_safe(element, property, default)
+    local value = default
+    pcall(function()
+        value = element[property]
+    end)
+    return value
+end
+
 function PropertiesView:get_data(element_choosed)
     local prototype = {header={},methods={},attributes={}}
     table.insert(prototype.header, self:get_attribute_data("icon", nil, "sprite", element_choosed))
-    table.insert(prototype.header, self:get_attribute_data("type", nil, "string", element_choosed.type))
-    table.insert(prototype.header, self:get_attribute_data("name", nil, "string", element_choosed.name))
-    pcall(function()
-        table.insert(prototype.header, self:get_attribute_data("quality", nil, "string", element_choosed.quality))
-    end)
+    
+    local element_type = self:get_property_safe(element_choosed, "type", type(element_choosed))
+    table.insert(prototype.header, self:get_attribute_data("type", nil, "string", element_type))
+
+    local element_name = self:get_property_safe(element_choosed, "name", type(element_choosed))
+    table.insert(prototype.header, self:get_attribute_data("name", nil, "string", element_name))
+    
+    local element_quality = self:get_property_safe(element_choosed, "quality", nil)
+    table.insert(prototype.header, self:get_attribute_data("quality", nil, "string", element_quality))
 
     local lua_prototype= self:get_lua_prototype(element_choosed)
-    if lua_prototype ~= nil then
-        table.insert(prototype.header, self:get_attribute_data("lua_prototype", nil, "lua_prototype", lua_prototype.object_name))
-        local lua_classe = RuntimeApi.get_classe(lua_prototype.object_name)
+    local object_name = nil
+    local ok , err = pcall(function()
+        object_name = lua_prototype.object_name
+    end)
+    if not(ok) then
+        object_name = type(lua_prototype)
+    end
+    if lua_prototype ~= nil and object_name ~= nil then
+        table.insert(prototype.header, self:get_attribute_data("lua_prototype", nil, "lua_prototype", object_name))
+        local lua_classe = RuntimeApi.get_classe(object_name)
         while lua_classe ~= nil do
             for _, lua_method in pairs(lua_classe.methods) do
+                local lua_qualities = nil 
+                if lua_method.parameters ~= nil and #lua_method.parameters == 1 and lua_method.parameters[1].name == "quality" then
+                    lua_qualities = prototypes.quality
+                end
                 local content = nil
-                pcall(function()
-                    content = lua_prototype[lua_method.name]()
-                end)
+                if lua_qualities ~= nil then
+                    content = {}
+                    for _, lua_quality in pairs(lua_qualities) do
+                        local quality_content = nil
+                        pcall(function()
+                            quality_content = lua_prototype[lua_method.name](lua_quality)
+                        end)
+                        content[lua_quality.name] = quality_content
+                    end
+                else
+                    pcall(function()
+                        content = lua_prototype[lua_method.name]()
+                    end)
+                end
                 local content_type = type(content)
                 if lua_method.return_values ~= nil and lua_method.return_values[1] ~= nil then
-                    content_type = lua_method.return_values[1].type
+                    pcall(function()
+                        content_type = lua_method.return_values[1].type
+                    end)
                 end
                 table.insert(prototype.methods, self:get_attribute_data(lua_method.name, lua_method.description, content_type,content))
             end
@@ -749,10 +786,13 @@ end
 
 function PropertiesView:get_lua_prototype(element)
     local lua_prototype = {}
-    local attribute = string.gsub(element.type, "-", "_")
-    pcall(function()
+    local ok , err = pcall(function()
+        local attribute = string.gsub(element.type, "-", "_")
         lua_prototype = prototypes[attribute][element.name]
     end)
+    if not(ok) then
+        return element
+    end
     return lua_prototype
 end
 

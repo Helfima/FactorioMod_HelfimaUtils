@@ -1,4 +1,12 @@
 ---------------------------------------------------------------------------------------------------
+Version: 1.0.9
+Date: 2025-10-15
+  Changes:
+    - Updated source api 2.0.69
+    - Added quality values when a method use quality
+  Bugfixes:
+    - Fixed error with some prototype, added a get_property_safe method
+---------------------------------------------------------------------------------------------------
 Version: 1.0.8
 Date: 2025-07-31
   Bugfixes:
