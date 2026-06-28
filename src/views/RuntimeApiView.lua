@@ -1,4 +1,5 @@
 -------------------------------------------------------------------------------
+---@see https://lua-api.factorio.com/latest/runtime-api.json
 ---Class to build rule edition dialog
 ---@class RuntimaApiView : Form
 RuntimaApiView = newclass(Form, function(base, classname)

@@ -11,6 +11,7 @@ handler.add_lib(Dispatcher)
 handler.add_lib(RuntimeApi)
 
 Form.views["PropertiesView"] = PropertiesView("PropertiesView")
+Form.views["PrototypeFiltersView"] = PrototypeFiltersView("PrototypeFiltersView")
 Form.views["RuntimaApiView"] = RuntimaApiView("RuntimaApiView")
 
 local command_help = string.format("%s commands", defines.mod.mod_name)
